@@ -838,7 +838,7 @@ impl MetaVoteContract {
     ) {
         self.assert_operator();
         // external mirrored addresses are in the form of [address].evmp.near
-        // example for an eth based address: eth.f1552d1d7CD279A7B766F431c5FaC49A2fb6e361.evmp.near
+        // example for an eth based address: f1552d1d7CD279A7B766F431c5FaC49A2fb6e361.evmp.near
         // evmp.near is controlled by the dao. No external user can create a xxx.evmp.near account
         let voter_id = utils::pseudo_near_address(&external_address);
         let mut voter = self.internal_get_voter(&voter_id);
@@ -882,8 +882,7 @@ impl MetaVoteContract {
         // Note: internal_create_locking_position also adds to the contract total voting power
         // create locking positions
         for lp in &locking_positions {
-            // migrate with new voting power calculation
-            // amount is in META w/24 decimals, convert to mpDAO w/6 decimals
+            // create mirrored locking position
             let unbond_days = lp.0;
             let mpdao_amount = lp.1 .0;
             self.internal_create_locking_position(&mut voter, mpdao_amount, unbond_days);

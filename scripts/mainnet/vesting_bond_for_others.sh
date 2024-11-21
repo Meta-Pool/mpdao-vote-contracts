@@ -4,7 +4,10 @@ __dir=$(dirname "$0")
 
 if [ $# -ne 3 ]; then
   echo "Error: Please provide exactly 3 arguments."
-  echo "voter_id, mpDAO-amount bonding-days"
+  echo "voter_id, mpDAO-amount, bonding-days"
+  if [ $# -eq 1 ]; then
+    near view $METAVOTE_CONTRACT_ADDRESS get_voter_info '{"voter_id":"'$1'"}'
+  fi
   exit 1
 fi
 echo VESTING for $1 $2 mpDAO for $3 days

@@ -37,10 +37,9 @@ impl FungibleTokenReceiver for MetaVoteContract {
             let (voter_id, days) = if msg.len() >= 1 && &msg[..1] == "[" {
                 // deposit & bond for others
                 match serde_json::from_str::<(String, u16)>(&msg) {
-                    Ok(pair) => {
-                        // to increase security, limit this option to owner: meta-pool-dao.near
-                        assert_eq!(sender_id, self.owner_id, "only allowed for owner");
-                        pair
+                    Ok(voter_and_days) => {
+                        // sending user wants to lock for others. Normally meta pool DAO granting locked mpDAO to collaborators
+                        voter_and_days // assign to voter_id, days
                     }
                     Err(_) => {
                         panic!("Err parsing msg, expected [voter_id,days]")
