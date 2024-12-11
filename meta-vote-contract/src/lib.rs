@@ -5,7 +5,7 @@ use near_sdk::{
     collections::{unordered_map::UnorderedMap, Vector},
     env, log, near_bindgen, require,
     store::LookupMap,
-    AccountId, Balance, PanicOnDefault, Promise,
+    AccountId, Balance, PanicOnDefault, Promise, ONE_NEAR,
 };
 use types::*;
 use voter::Voter;
@@ -63,6 +63,8 @@ pub struct MetaVoteContract {
     pub lock_votes_in_end_timestamp_ms: u64,
     pub lock_votes_in_address: Option<String>,
     pub lock_votes_in_numeric_id: u16,
+
+    pub mpdao_per_near_e24: u128,
 }
 
 #[near_bindgen]
@@ -114,6 +116,7 @@ impl MetaVoteContract {
             lock_votes_in_end_timestamp_ms: 0,
             lock_votes_in_address: None,
             lock_votes_in_numeric_id: 0,
+            mpdao_per_near_e24: 0,
         }
     }
 
@@ -727,7 +730,7 @@ impl MetaVoteContract {
     ) {
         // verify if the votes are locked (for example last 48hs of grants voting up to 20 days after)
         if let Some(lock_votes_in_address) = &self.lock_votes_in_address {
-            if self.lock_votes_in_end_timestamp_ms > env::block_timestamp_ms() 
+            if self.lock_votes_in_end_timestamp_ms > env::block_timestamp_ms()
                 && lock_votes_in_address == contract_address
             {
                 let votable_object_id_filter = format!(" #{} ", self.lock_votes_in_numeric_id);
@@ -771,6 +774,67 @@ impl MetaVoteContract {
             self.lock_votes_in_address,
             self.lock_votes_in_numeric_id,
         )
+    }
+
+    #[payable]
+    pub fn update_mpdao_per_near_e24(&mut self, mpdao_per_near_e24: U128String) {
+        self.assert_operator();
+        // sanity check
+        assert!(
+            mpdao_per_near_e24.0 >= ONE_NEAR,
+            "mpdao_per_near_e24 should be greater than ONE per NEAR"
+        );
+        self.mpdao_per_near_e24 = mpdao_per_near_e24.0;
+    }
+
+    #[payable]
+    pub fn buy_lock_and_vote(
+        &mut self,
+        days: u16,
+        contract_address: ContractAddress,
+        votable_object_id: VotableObjId,
+    ) {
+        // sanity check
+        assert!(
+            self.mpdao_per_near_e24 >= ONE_NEAR,
+            "invalid mpdao_per_near_e24"
+        );
+        let amount_near = env::attached_deposit();
+        assert!(
+            amount_near >= ONE_NEAR / 100,
+            "Minimum deposit amount is 0.01 NEAR."
+        );
+        let voter_id = env::predecessor_account_id().as_str().to_string();
+        let mut voter = self.internal_get_voter(&voter_id);
+        let mpdao_amount = proportional(amount_near, self.mpdao_per_near_e24, ONE_NEAR);
+        self.deposit_locking_position(mpdao_amount, days, &voter_id, &mut voter);
+
+        let voting_power = utils::calculate_voting_power(mpdao_amount, days);
+        log!(
+            "buy_lock_and_vote: {} {} yNEAR => {} mpDAO",
+            voter_id,
+            amount_near,
+            mpdao_amount
+        );
+        self.internal_vote(
+            &voter_id,
+            voting_power.into(),
+            contract_address,
+            votable_object_id,
+        )
+    }
+
+    // If extra NEAR balance (from buy_lock_and_vote)
+    // transfer to owner
+    pub fn transfer_extra_balance(&mut self) -> U128String {
+        let storage_cost = env::storage_usage() as u128 * env::storage_byte_cost();
+        let extra_balance = env::account_balance() - storage_cost;
+        if extra_balance >= 2 * ONE_NEAR {
+            // only if there's more than 1 NEAR to transfer, and leave 1 extra NEAR to backup the storage an extra 100kb
+            Promise::new(self.owner_id.clone()).transfer(extra_balance - ONE_NEAR);
+            return extra_balance.into();
+        }
+        return 0.into();
     }
 
     #[payable]

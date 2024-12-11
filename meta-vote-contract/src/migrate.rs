@@ -35,6 +35,11 @@ pub struct OldState {
     pub evm_delegates: UnorderedMap<String, Vec<EvmAddress>>,
     pub evm_pre_delegation: LookupMap<EvmAddress, (String, EvmSignature)>,
     pub evm_delegation_signatures: LookupMap<EvmAddress, (String, EvmSignature)>,
+
+    pub lock_votes_in_end_timestamp_ms: u64,
+    pub lock_votes_in_address: Option<String>,
+    pub lock_votes_in_numeric_id: u16,
+
 }
 
 #[near_bindgen]
@@ -78,9 +83,11 @@ impl MetaVoteContract {
             evm_delegation_signatures: old.evm_delegation_signatures,
             evm_pre_delegation: old.evm_pre_delegation,
 
-            lock_votes_in_end_timestamp_ms: 0,
-            lock_votes_in_address: None,
-            lock_votes_in_numeric_id: 0,
+            lock_votes_in_end_timestamp_ms: old.lock_votes_in_end_timestamp_ms,
+            lock_votes_in_address: old.lock_votes_in_address,
+            lock_votes_in_numeric_id: old.lock_votes_in_numeric_id,
+
+            mpdao_per_near_e24: 0,
         }
     }
 }
