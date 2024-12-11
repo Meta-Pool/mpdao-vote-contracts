@@ -1,6 +1,11 @@
-use near_sdk::{collections::UnorderedMap, json_types::{U128, U64}, near_bindgen, serde::Serialize};
-use crate::{voter::VoterJSON, MetaVoteContract, MetaVoteContractExt, StorageKey};
 use crate::types::*;
+use crate::{voter::VoterJSON, MetaVoteContract, MetaVoteContractExt, StorageKey};
+use near_sdk::{
+    collections::UnorderedMap,
+    json_types::{U128, U64},
+    near_bindgen,
+    serde::Serialize,
+};
 
 type U128String = U128;
 
@@ -27,6 +32,8 @@ pub struct ContractInfoJson {
     pub accum_distributed_stnear_for_claims: U128String,
     pub total_unclaimed_stnear: U128String,
     pub evm_delegates_count: u64,
+    pub mpdao_per_near_e24: U128String,
+    pub mpdao_avail_to_sell: U128String,
 }
 
 #[near_bindgen]
@@ -40,23 +47,27 @@ impl MetaVoteContract {
 
     pub fn get_contract_info(&self) -> ContractInfoJson {
         ContractInfoJson {
-            owner_id : self.owner_id.as_str().into(),
-            operator_id : self.operator_id.as_str().into(),
-            voter_count : self.voters.len(),
-            min_unbond_period : self.min_unbond_period,
-            max_unbond_period : self.max_unbond_period,
-            min_deposit_amount : self.min_deposit_amount.into(),
-            max_locking_positions : self.max_locking_positions,
-            max_voting_positions : self.max_voting_positions,
-            mpdao_token_contract_address : self.mpdao_token_contract_address.as_str().into(),
-            stnear_token_contract_address : self.stnear_token_contract_address.as_str().into(),
-            registration_cost : self.registration_cost.into(),
-            prev_governance_contract : self.prev_governance_contract.as_str().into(),
-            accumulated_mpdao_distributed_for_claims : self.accumulated_mpdao_distributed_for_claims.into(),
-            total_unclaimed_mpdao : self.total_unclaimed_mpdao.into(),
-            accum_distributed_stnear_for_claims : self.accum_distributed_stnear_for_claims.into(),
-            total_unclaimed_stnear : self.total_unclaimed_stnear.into(),
-            evm_delegates_count : self.evm_delegates.len(),
+            owner_id: self.owner_id.as_str().into(),
+            operator_id: self.operator_id.as_str().into(),
+            voter_count: self.voters.len(),
+            min_unbond_period: self.min_unbond_period,
+            max_unbond_period: self.max_unbond_period,
+            min_deposit_amount: self.min_deposit_amount.into(),
+            max_locking_positions: self.max_locking_positions,
+            max_voting_positions: self.max_voting_positions,
+            mpdao_token_contract_address: self.mpdao_token_contract_address.as_str().into(),
+            stnear_token_contract_address: self.stnear_token_contract_address.as_str().into(),
+            registration_cost: self.registration_cost.into(),
+            prev_governance_contract: self.prev_governance_contract.as_str().into(),
+            accumulated_mpdao_distributed_for_claims: self
+                .accumulated_mpdao_distributed_for_claims
+                .into(),
+            total_unclaimed_mpdao: self.total_unclaimed_mpdao.into(),
+            accum_distributed_stnear_for_claims: self.accum_distributed_stnear_for_claims.into(),
+            total_unclaimed_stnear: self.total_unclaimed_stnear.into(),
+            evm_delegates_count: self.evm_delegates.len(),
+            mpdao_per_near_e24: self.mpdao_per_near_e24.into(),
+            mpdao_avail_to_sell: self.mpdao_avail_to_sell.into(),
         }
     }
 
