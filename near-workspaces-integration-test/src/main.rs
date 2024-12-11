@@ -1,3 +1,4 @@
+use near_sdk::ONE_NEAR;
 // use std::fs;
 // use meta_tools::types::{EpochMillis, VaultId};
 // use meta_tools::utils::proportional;
@@ -6,8 +7,7 @@ use near_units::parse_near;
 use tokio::try_join;
 // use json;
 use std::{
-    str::{self, FromStr},
-    time::SystemTime,
+    str::{self, FromStr}, time::SystemTime
 };
 // use near_sdk::json_types::{U128, U64};
 
@@ -26,7 +26,10 @@ const METAVOTE_FILEPATH: &str = "../res/meta_vote_contract.wasm";
 const MPIP_FILEPATH: &str = "../res/mpip_contract.wasm";
 const MPDAO_TEST_TOKEN_FILEPATH: &str = "../res/test_meta_token.wasm";
 
+pub const E6: u128 = 1_000_000;
 pub const E24: u128 = 1_000_000_000_000_000_000_000_000;
+
+pub const ONE_MPDAO: u128 = 1_000_000;
 
 fn mpdao_as_u128_string(mpdao_amount: u64) -> String {
     format!("{}000000", mpdao_amount)
@@ -85,6 +88,7 @@ async fn main() -> anyhow::Result<()> {
     let owner = create_account(&worker, "owner").await?;
     let voter = create_account(&worker, "voter").await?;
     let third_user = create_account(&worker, "third").await?;
+    let buy_vote_user = create_account(&worker, "ape").await?;
     let proposer = create_account(&worker, "proposer").await?;
     let operator = create_account(&worker, "operator").await?;
 
@@ -200,6 +204,160 @@ async fn main() -> anyhow::Result<()> {
         let expected_vp: u128 = locked_mpdao as u128 * 4 * E24;
         println!("delegate for others vp: {:?}", vp);
         assert_eq!(vp, expected_vp, "Vp <> expected_vp");
+    }
+
+    // -----------
+    // test buy lock & vote
+    // -----------
+    {
+
+        let mpdao_per_near = 12 * ONE_NEAR; // price: the user gets 12 mpdao per each NEAR
+
+        let args = serde_json::json!({
+            "mpdao_per_near_e24": mpdao_per_near.to_string(),
+        });
+        let res = operator
+            .call(metavote_contract.id(), "update_mpdao_per_near_e24")
+            .args_json(&args)
+            .gas(NearGas::from_tgas(30))
+            .deposit(NearToken::from_yoctonear(1))
+            .transact()
+            .await?;
+        //println!("args {:?}\n {:?}\n", args, res);
+        if res.failures().len() > 0 {
+            println!(
+                "update_mpdao_per_near_e24 ERR: {:?}\n",
+                res
+            );
+        }
+
+        let near_amount = 10;
+        let locked_mpdao =  near_amount * mpdao_per_near / ONE_NEAR * ONE_MPDAO;
+        println!("expected locked_mpdao: {:?}", locked_mpdao);
+
+        let res = owner
+            .call(metavote_contract.id(), "update_mpdao_avail_to_sell")
+            .args_json(serde_json::json!({
+                "mpdao_avail_to_sell": (locked_mpdao -1).to_string(),
+            }))
+            .gas(NearGas::from_tgas(30))
+            .deposit(NearToken::from_yoctonear(1))
+            .transact()
+            .await?;
+        //println!("args {:?}\n {:?}\n", args, res);
+        if res.failures().len() > 0 {
+            println!(
+                "update_mpdao_avail_to_sell ERR: {:?}\n",
+                res
+            );
+        }
+
+        let grants8_object_id = "1234|mpDAO Grants #8 - August 2024-asking-user.near";
+
+        let days = 240;
+        let args = serde_json::json!({
+            "days": days,
+            "contract_address": "initiatives",
+            "votable_object_id": grants8_object_id
+        });
+
+        // should fail
+        let res = buy_vote_user
+            .call(metavote_contract.id(), "buy_lock_and_vote")
+            .args_json(&args)
+            .gas(NearGas::from_tgas(200))
+            .deposit(NearToken::from_near(near_amount))
+            .transact()
+            .await?;
+        //println!("args {:?}\n {:?}\n", args, res);
+        if res.failures().len() == 0 {
+            println!(
+                "expected Err:Not enough mpDAO available to sell, but OK: {:?}\n",
+                res
+            );
+        }
+
+        let res = owner
+            .call(metavote_contract.id(), "update_mpdao_avail_to_sell")
+            .args_json(serde_json::json!({
+                "mpdao_avail_to_sell": locked_mpdao.to_string(),
+            }))
+            .gas(NearGas::from_tgas(30))
+            .deposit(NearToken::from_yoctonear(1))
+            .transact()
+            .await?;
+        //println!("args {:?}\n {:?}\n", args, res);
+        if res.failures().len() > 0 {
+            println!(
+                "update_mpdao_avail_to_sell ERR: {:?}\n",
+                res
+            );
+        }
+
+        // should work
+        let res = buy_vote_user
+            .call(metavote_contract.id(), "buy_lock_and_vote")
+            .args_json(&args)
+            .gas(NearGas::from_tgas(200))
+            .deposit(NearToken::from_near(near_amount))
+            .transact()
+            .await?;
+        //println!("args {:?}\n {:?}\n", args, res);
+        if res.failures().len() > 0 {
+            println!(
+                "buy_lock_and_vote ERR: {:?}\n",
+                res
+            );
+        }
+        // else {
+        //     println!(
+        //         "buy_lock_and_vote: {:?}\n",
+        //         res
+        //     );
+        // }
+        // verify voting power
+        let res = owner
+            .call(metavote_contract.id(), "get_used_voting_power")
+            .args_json(serde_json::json!({
+                "voter_id": buy_vote_user.id()
+            }))
+            .gas(NearGas::from_tgas(200))
+            .deposit(NearToken::from_yoctonear(1))
+            .transact()
+            .await?;
+        let res = &res.raw_bytes().unwrap().clone();
+        let res = str::from_utf8(res).unwrap();
+        let res = json::parse(&res)?;
+        let vp: u128 = res.to_string().parse().unwrap();
+        let expected_vp: u128 = locked_mpdao * days/60 * E24 / E6;
+        println!("buy_lock_and_vote vp: {:?}", vp);
+        assert_eq!(vp, expected_vp, "Vp <> expected_vp");
+
+        // unvote and starts unlocking (to not mess with vote proposal test)
+        let res = buy_vote_user
+            .call(metavote_contract.id(), "unvote")
+            .args_json(serde_json::json!({
+                "contract_address": "initiatives",
+                "votable_object_id": grants8_object_id
+            }))
+            .gas(NearGas::from_tgas(200))
+            .transact()
+            .await?;
+        if res.failures().len() > 0 {
+            panic!("unvote ERR: {:?}\n", res);
+        }
+        let res = buy_vote_user
+            .call(metavote_contract.id(), "unlock_position")
+            .args_json(serde_json::json!({
+                "index": 0
+            }))
+            .gas(NearGas::from_tgas(200))
+            // .deposit(NearToken::from_millinear(3))
+            .transact()
+            .await?;
+        if res.failures().len() > 0 {
+            panic!("unlock_position ERR: {:?}\n", res);
+        }
     }
 
     // -----------
@@ -1097,7 +1255,7 @@ pub(crate) const DEV_ACCOUNT_SEED: &str = "testificate";
 pub async fn create_account(worker: &Worker<Sandbox>, name: &str) -> anyhow::Result<Account> {
     let sk = SecretKey::from_seed(KeyType::ED25519, DEV_ACCOUNT_SEED);
     //    let (id, sk) = self.dev_generate().await;
-    let account_id = AccountId::from_str(&format!("{}.test.near", name)).unwrap();
+    let account_id = AccountId::from_str(&format!("{}.registrar", name)).unwrap();
     let account = worker.create_tla(account_id, sk).await?;
     Ok(account.into_result()?)
 }

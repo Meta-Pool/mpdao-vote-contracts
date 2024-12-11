@@ -1,6 +1,7 @@
 use near_sdk::{ext_contract, AccountId};
 use near_sdk::json_types::U128;
 
+#[allow(dead_code)]
 #[ext_contract(ext_ft)]
 pub trait FungibleTokenCore {
     fn ft_transfer_call(
@@ -19,6 +20,7 @@ pub trait FungibleTokenCore {
     );
 }
 
+#[allow(dead_code)]
 #[ext_contract(ext_self)]
 pub trait SelfMetaVote {
     fn after_transfer_mpdao_callback(

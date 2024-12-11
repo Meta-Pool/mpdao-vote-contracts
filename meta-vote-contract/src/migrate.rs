@@ -88,6 +88,7 @@ impl MetaVoteContract {
             lock_votes_in_numeric_id: old.lock_votes_in_numeric_id,
 
             mpdao_per_near_e24: 0,
+            mpdao_avail_to_sell: 0,
         }
     }
 }

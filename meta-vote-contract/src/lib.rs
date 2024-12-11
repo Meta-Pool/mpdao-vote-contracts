@@ -65,6 +65,7 @@ pub struct MetaVoteContract {
     pub lock_votes_in_numeric_id: u16,
 
     pub mpdao_per_near_e24: u128,
+    pub mpdao_avail_to_sell: u128,
 }
 
 #[near_bindgen]
@@ -117,6 +118,7 @@ impl MetaVoteContract {
             lock_votes_in_address: None,
             lock_votes_in_numeric_id: 0,
             mpdao_per_near_e24: 0,
+            mpdao_avail_to_sell: 0,
         }
     }
 
@@ -788,6 +790,12 @@ impl MetaVoteContract {
     }
 
     #[payable]
+    pub fn update_mpdao_avail_to_sell(&mut self, mpdao_avail_to_sell: U128String) {
+        self.assert_only_owner();
+        self.mpdao_avail_to_sell = mpdao_avail_to_sell.0;
+    }
+
+    #[payable]
     pub fn buy_lock_and_vote(
         &mut self,
         days: u16,
@@ -806,7 +814,12 @@ impl MetaVoteContract {
         );
         let voter_id = env::predecessor_account_id().as_str().to_string();
         let mut voter = self.internal_get_voter(&voter_id);
-        let mpdao_amount = proportional(amount_near, self.mpdao_per_near_e24, ONE_NEAR);
+        let mpdao_amount_e24 = proportional(amount_near, self.mpdao_per_near_e24, ONE_NEAR);
+        let mpdao_amount = mpdao_amount_e24 / E18;
+
+        assert!(self.mpdao_avail_to_sell >= mpdao_amount, "Not enough mpDAO available to sell.");
+        self.mpdao_avail_to_sell -= mpdao_amount;
+
         self.deposit_locking_position(mpdao_amount, days, &voter_id, &mut voter);
 
         let voting_power = utils::calculate_voting_power(mpdao_amount, days);

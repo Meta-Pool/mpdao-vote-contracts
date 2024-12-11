@@ -2,6 +2,8 @@ use crate::types::{MpipId, VoterId};
 use crate::*;
 use near_sdk::json_types::U128;
 use near_sdk::{ext_contract, AccountId};
+
+#[allow(dead_code)]
 #[ext_contract(ext_metavote)]
 pub trait ExtMetaVote {
     // should call a fn to get all voting power (used or not) get_user_total_voting_power
@@ -10,6 +12,7 @@ pub trait ExtMetaVote {
     fn get_total_voting_power(&self);
 }
 
+#[allow(dead_code)]
 #[ext_contract(ext_self)]
 pub trait SelfMetaVote {
     fn vote_proposal_callback(
