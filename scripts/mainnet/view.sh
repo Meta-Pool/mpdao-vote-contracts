@@ -10,4 +10,5 @@ __dir=$(dirname "$0")
 #NEAR_ENV=mainnet near view meta-pipeline.near get_projects_in_folder '{"folder_id":6}'
 
 set -ex
-near view $METAVOTE_CONTRACT_ADDRESS get_voter_info '{"voter_id":"'$1'"}'
+near view mpdao-vote.near get_contract_info '{}'
+#near view $METAVOTE_CONTRACT_ADDRESS get_voter_info '{"voter_id":"'$1'"}'
