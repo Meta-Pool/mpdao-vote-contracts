@@ -817,7 +817,10 @@ impl MetaVoteContract {
         let mpdao_amount_e24 = proportional(amount_near, self.mpdao_per_near_e24, ONE_NEAR);
         let mpdao_amount = mpdao_amount_e24 / E18;
 
-        assert!(self.mpdao_avail_to_sell >= mpdao_amount, "Not enough mpDAO available to sell.");
+        assert!(
+            self.mpdao_avail_to_sell >= mpdao_amount,
+            "Not enough mpDAO available to sell."
+        );
         self.mpdao_avail_to_sell -= mpdao_amount;
 
         self.deposit_locking_position(mpdao_amount, days, &voter_id, &mut voter);
@@ -842,10 +845,11 @@ impl MetaVoteContract {
     pub fn transfer_extra_balance(&mut self) -> U128String {
         let storage_cost = env::storage_usage() as u128 * env::storage_byte_cost();
         let extra_balance = env::account_balance() - storage_cost;
-        if extra_balance >= 2 * ONE_NEAR {
-            // only if there's more than 1 NEAR to transfer, and leave 1 extra NEAR to backup the storage an extra 100kb
-            Promise::new(self.owner_id.clone()).transfer(extra_balance - ONE_NEAR);
-            return extra_balance.into();
+        if extra_balance >= 6 * ONE_NEAR {
+            // only if there's more than 6 NEAR to transfer, and leave 5 extra NEAR to backup the storage an extra 500kb
+            let extra = extra_balance - 5 * ONE_NEAR;
+            Promise::new(self.owner_id.clone()).transfer(extra);
+            return extra.into();
         }
         return 0.into();
     }
