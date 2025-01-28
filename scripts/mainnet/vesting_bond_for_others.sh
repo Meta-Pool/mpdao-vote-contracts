@@ -16,4 +16,4 @@ near call $MPDAO_TOKEN_ADDRESS ft_transfer_call \
       --accountId $OWNER_ID --depositYocto 1 --gas 150000000000000
 sleep 2
 set -ex
-near view $METAVOTE_CONTRACT_ADDRESS get_voter_info '{"voter_id":"'$1'"}'
+# near view $METAVOTE_CONTRACT_ADDRESS get_voter_info '{"voter_id":"'$1'"}'
