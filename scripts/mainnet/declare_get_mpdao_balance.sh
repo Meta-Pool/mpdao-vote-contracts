@@ -29,3 +29,21 @@ get_mpdao_balance() {
 # example:
 # get_mpdao_balance meta-pool-dao.near
 # echo $BALANCE
+
+get_near_balance() {
+  if [ $# -ne 1 ]; then
+    echo "Error: Please provide exactly account_id"
+    echo "Usage: get_near_balance <account_id>"
+    return 1
+  fi
+
+  local ACCOUNT=$1
+
+  # split at : and get the second part
+  local RESULT=$(near state $ACCOUNT | grep amount | tr -d "', " | cut -d: -f2)
+  # convert to number and divide by 1e24, add thousand separator
+  echo $RESULT
+  BALANCE=$(echo "scale=2; $RESULT / 1000000000000000000000000" | bc)
+  local WITH_SEPARATORS=$(echo $BALANCE | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')
+  echo $ACCOUNT NEAR balance: $WITH_SEPARATORS
+}
