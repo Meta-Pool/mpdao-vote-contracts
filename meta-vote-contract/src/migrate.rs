@@ -40,6 +40,8 @@ pub struct OldState {
     pub lock_votes_in_address: Option<String>,
     pub lock_votes_in_numeric_id: u16,
 
+    pub mpdao_per_near_e24: u128,
+    pub mpdao_avail_to_sell: u128,
 }
 
 #[near_bindgen]
@@ -87,8 +89,10 @@ impl MetaVoteContract {
             lock_votes_in_address: old.lock_votes_in_address,
             lock_votes_in_numeric_id: old.lock_votes_in_numeric_id,
 
-            mpdao_per_near_e24: 0,
-            mpdao_avail_to_sell: 0,
+            mpdao_per_near_e24: old.mpdao_per_near_e24,
+            mpdao_avail_to_sell: old.mpdao_avail_to_sell,
+
+            min_claim_and_bond_days: old.max_unbond_period / 2,
         }
     }
 }

@@ -66,6 +66,9 @@ pub struct MetaVoteContract {
 
     pub mpdao_per_near_e24: u128,
     pub mpdao_avail_to_sell: u128,
+
+    // added 2025-03-28
+    pub min_claim_and_bond_days: u16,
 }
 
 #[near_bindgen]
@@ -119,6 +122,7 @@ impl MetaVoteContract {
             lock_votes_in_numeric_id: 0,
             mpdao_per_near_e24: 0,
             mpdao_avail_to_sell: 0,
+            min_claim_and_bond_days: min_unbond_period,
         }
     }
 
@@ -211,6 +215,11 @@ impl MetaVoteContract {
 
     // claim mpDAO and create/update a locking position
     pub fn claim_and_lock(&mut self, amount: U128String, locking_period: u16) {
+        assert!(
+            locking_period >= self.min_claim_and_bond_days,
+            "Minimum claim and bond period is {} days",
+            self.min_claim_and_bond_days
+        );
         let amount = amount.0;
         self.assert_min_deposit_amount(amount);
         let voter_id: String = env::predecessor_account_id().into();
@@ -871,6 +880,12 @@ impl MetaVoteContract {
         assert_one_yocto();
         self.assert_only_owner();
         self.prev_governance_contract = contract_id;
+    }
+    #[payable]
+    pub fn update_min_claim_and_bond_days(&mut self, min_claim_and_lock_days: Days) {
+        assert_one_yocto();
+        self.assert_only_owner();
+        self.min_claim_and_bond_days = min_claim_and_lock_days;
     }
 
     // user-started migration of locking-positions from prev-governance-contract

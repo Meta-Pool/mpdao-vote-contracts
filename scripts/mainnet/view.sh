@@ -12,6 +12,7 @@ __dir=$(dirname "$0")
 
 #near view mpdao-vote.near get_contract_info '{}'
 #near view $METAVOTE_CONTRACT_ADDRESS get_voter_info '{"voter_id":"'$1'"}'
+near view $METAVOTE_CONTRACT_ADDRESS get_voter_info '{"voter_id":"luciotato.near"}'
 get_near_balance $METAVOTE_CONTRACT_ADDRESS
 
 get_mpdao_balance meta-pool-dao.near

@@ -24,9 +24,7 @@ impl MetaVoteContract {
 
     /// Inner method to get or create a Voter.
     pub(crate) fn internal_get_voter(&self, voter_id: &String) -> Voter {
-        self.voters
-            .get(&voter_id)
-            .unwrap_or(Voter::new(&voter_id))
+        self.voters.get(&voter_id).unwrap_or(Voter::new(&voter_id))
     }
     pub(crate) fn internal_get_voter_or_panic(&self, voter_id: &String) -> Voter {
         match self.voters.get(&voter_id) {
@@ -87,7 +85,7 @@ impl MetaVoteContract {
     }
 
     // ***************************
-    // * Claimable Meta & stNear *
+    // * Claimable mpDao & stNear *
     // ***************************
 
     fn add_claimable(
