@@ -368,13 +368,21 @@ impl MpipContract {
     // *********
     // * VOTER FUNCTIONS *
     // *********
-
-    pub fn vote_proposal(
+    pub fn vote_proposal_vp_limit(
         &mut self,
         mpip_id: MpipId,
         vote: VoteType,
+        vp_limit: U128,
         memo: String,
     ) {
+        self.vote_proposal_internal(mpip_id, vote, vp_limit.0, memo);
+    }
+
+    pub fn vote_proposal(&mut self, mpip_id: MpipId, vote: VoteType, memo: String) {
+        self.vote_proposal_internal(mpip_id, vote, 0, memo);
+    }
+
+    pub(crate) fn vote_proposal_internal(&mut self, mpip_id: MpipId, vote: VoteType, limit_vp: u128, memo: String) {
         self.assert_proposal_is_on_voting(&mpip_id);
         self.assert_has_not_voted(mpip_id, env::predecessor_account_id());
         ext_metavote::ext(self.meta_vote_contract_address.clone())
@@ -388,6 +396,7 @@ impl MpipContract {
                         mpip_id.clone(),
                         env::predecessor_account_id(),
                         vote,
+                        U128(limit_vp),
                         memo,
                     ),
             );
@@ -399,6 +408,7 @@ impl MpipContract {
         mpip_id: MpipId,
         voter_id: AccountId,
         vote_type: VoteType,
+        limit_vp: U128,
         memo: String,
     ) {
         let total_v_power = self.internal_get_user_total_voting_power_from_promise();
@@ -408,8 +418,13 @@ impl MpipContract {
             "Not enough voting power to vote! You have {}",
             total_v_power
         );
+        let vote_v_power = if limit_vp.0 > 0 && total_v_power >= limit_vp.0 {
+            limit_vp.0
+        } else {
+            total_v_power
+        };
+
         let mut proposal_vote = self.internal_get_proposal_vote(mpip_id);
-        let vote_v_power = total_v_power;
         let vote = Vote::new(
             mpip_id.clone(),
             vote_type.clone(),
