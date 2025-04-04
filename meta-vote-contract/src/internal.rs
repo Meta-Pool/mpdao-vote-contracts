@@ -163,4 +163,41 @@ impl MetaVoteContract {
             "stNEAR",
         );
     }
+
+    pub(crate) fn claim_stnear_internal(
+        &mut self,
+        voter_id: &String,
+        receiver_id: &String,
+        amount: u128,
+    ) -> Promise {
+        // remove claim
+        self.remove_claimable_stnear(&voter_id, amount);
+        // transfer to destination
+        self.transfer_claimable_stnear_to_receiver(&voter_id, &receiver_id, amount)
+    }
+
+    pub(crate) fn claim_and_bond_internal(
+        &mut self,
+        account: &String,
+        beneficiary_id: &String,
+        amount: u128,
+        locking_period: u16,
+    ) {
+        assert!(
+            locking_period >= self.min_claim_and_bond_days,
+            "Minimum claim and bond period is {} days",
+            self.min_claim_and_bond_days
+        );
+        self.assert_min_deposit_amount(amount);
+        self.remove_claimable_mpdao(&account, amount);
+        // get beneficiary voter
+        let mut beneficiary_voter = self.internal_get_voter(&beneficiary_id);
+        // create/update locking position
+        self.deposit_locking_position(
+            amount,
+            locking_period,
+            &beneficiary_id,
+            &mut beneficiary_voter,
+        );
+    }
 }

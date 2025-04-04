@@ -23,8 +23,7 @@ impl MetaVoteContract {
     }
 
     pub fn get_pre_delegate_evm_address(&self, evm_address: String) -> Option<&(String, String)> {
-        self.evm_pre_delegation
-            .get(&evm_address)
+        self.evm_pre_delegation.get(&evm_address)
     }
 
     #[payable]
@@ -80,16 +79,40 @@ impl MetaVoteContract {
         evm_address: EvmAddress,
         amount: U128String,
     ) -> Promise {
+        assert_one_yocto();
         // verify delegation and compose the pseudo near account
         let pseudo_account = self.verify_delegate(&evm_address);
-        // remove the claim
-        self.remove_claimable_stnear(&pseudo_account, amount.0);
-        // transfer to delegate
-        self.transfer_stnear_to_voter(
+        // claim
+        self.claim_stnear_internal(
             &pseudo_account,
-            &env::predecessor_account_id().into(),
+            &env::predecessor_account_id().to_string(),
             amount.0,
         )
+
+        // self.remove_claimable_stnear(&pseudo_account, amount.0);
+        // // transfer to delegate
+        // self.transfer_claimable_stnear_to_receiver(
+        //     &pseudo_account,
+        //     &env::predecessor_account_id().into(),
+        //     amount.0,
+        // )
+    }
+    #[payable]
+    pub fn delegated_claim_and_bond_mpdao(
+        &mut self,
+        evm_address: EvmAddress,
+        amount: U128String,
+        locking_period: u16,
+    ) {
+        assert_one_yocto();
+        // verify delegation and compose the pseudo near account
+        let pseudo_account = self.verify_delegate(&evm_address);
+        self.claim_and_bond_internal(
+            &pseudo_account,
+            &env::predecessor_account_id().to_string(),
+            amount.0,
+            locking_period,
+        );
     }
 
     // local fn: verify delegation and compose pseudo account

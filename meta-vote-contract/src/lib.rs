@@ -215,27 +215,18 @@ impl MetaVoteContract {
 
     // claim mpDAO and create/update a locking position
     pub fn claim_and_lock(&mut self, amount: U128String, locking_period: u16) {
-        assert!(
-            locking_period >= self.min_claim_and_bond_days,
-            "Minimum claim and bond period is {} days",
-            self.min_claim_and_bond_days
-        );
-        let amount = amount.0;
-        self.assert_min_deposit_amount(amount);
-        let voter_id: String = env::predecessor_account_id().into();
-        self.remove_claimable_mpdao(&voter_id, amount);
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
-        // create/update locking position
-        self.deposit_locking_position(amount, locking_period, &voter_id, &mut voter);
+        let voter_id = env::predecessor_account_id().to_string();
+        self.claim_and_bond_internal(&voter_id, &voter_id.clone(), amount.0, locking_period);
     }
 
     // claim stNear
     pub fn claim_stnear(&mut self, amount: U128String) -> Promise {
         let amount = amount.0;
         let voter_id = env::predecessor_account_id().to_string();
-        self.remove_claimable_stnear(&voter_id, amount);
         let receiver = voter_id.clone();
-        self.transfer_stnear_to_voter(&voter_id, &receiver, amount)
+        self.claim_stnear_internal(&voter_id, &receiver, amount)
+        //self.remove_claimable_stnear(&voter_id, amount);
+        //self.transfer_claimable_stnear_to_receiver(&voter_id, &receiver, amount)
     }
 
     // *************

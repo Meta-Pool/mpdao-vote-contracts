@@ -1,5 +1,6 @@
 use crate::interface::*;
 use crate::*;
+//use near_contract_standards::fungible_token::receiver;
 use near_sdk::{assert_one_yocto, json_types::U128, near_bindgen, Promise, PromiseResult};
 
 #[near_bindgen]
@@ -48,7 +49,15 @@ impl MetaVoteContract {
     ) {
         let amount_to_withdraw = amount_from_balance.0;
         let voter_id = env::predecessor_account_id().as_str().to_string();
-        self.internal_withdraw(&voter_id, position_index_list, if amount_to_withdraw==0 {None} else {Some(amount_to_withdraw)});
+        self.internal_withdraw(
+            &voter_id,
+            position_index_list,
+            if amount_to_withdraw == 0 {
+                None
+            } else {
+                Some(amount_to_withdraw)
+            },
+        );
     }
 
     #[payable]
@@ -105,9 +114,9 @@ impl MetaVoteContract {
     }
 
     /// This transfer is only to claim available stNEAR
-    pub(crate) fn transfer_stnear_to_voter(
+    pub(crate) fn transfer_claimable_stnear_to_receiver(
         &self,
-        source: &String,
+        source_voter: &String,
         receiver: &String,
         amount: Balance,
     ) -> Promise {
@@ -118,25 +127,35 @@ impl MetaVoteContract {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
-                    .after_transfer_stnear_callback(&source, U128::from(amount)),
+                    .after_transfer_stnear_callback(&source_voter, &receiver, U128::from(amount)),
             )
     }
 
     #[private]
-    pub fn after_transfer_stnear_callback(&mut self, source: &String, amount: U128) {
+    pub fn after_transfer_stnear_callback(
+        &mut self,
+        source_voter: &String,
+        receiver: &String,
+        amount: U128,
+    ) {
         let amount = amount.0;
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {
-                log!("{} WITHDRAW {} stNEAR", source, amount);
+                log!(
+                    "{} WITHDRAWN {} stNEAR to {}",
+                    source_voter,
+                    amount,
+                    receiver
+                );
             }
             PromiseResult::Failed => {
                 log!(
                     "FAILED: {} stNEAR not transferred. Recovering {} state.",
                     amount,
-                    source
+                    source_voter
                 );
-                self.add_claimable_stnear(source, amount);
+                self.add_claimable_stnear(source_voter, amount);
             }
         };
     }
