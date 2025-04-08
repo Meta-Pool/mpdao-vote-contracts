@@ -77,6 +77,7 @@ impl MetaVoteContract {
         self.voters.len().into()
     }
 
+    /** all users accumulated vp */
     pub fn get_total_voting_power(&self) -> U128String {
         self.total_voting_power.into()
     }
@@ -173,6 +174,11 @@ impl MetaVoteContract {
     pub fn get_unlocking_balance(&self, voter_id: VoterId) -> U128String {
         let voter = self.internal_get_voter(&voter_id);
         voter.sum_unlocking().into()
+    }
+
+    pub fn voter_total_voting_power(&self, voter_id: VoterId) -> U128String {
+        let voter = self.internal_get_voter(&voter_id);
+        voter.sum_voting_power().into()
     }
 
     pub fn get_available_voting_power(&self, voter_id: VoterId) -> U128String {

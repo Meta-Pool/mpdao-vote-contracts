@@ -8,8 +8,8 @@ pub struct VoterJSON {
     pub voter_id: String,
     pub balance_in_contract: U128String,
     pub locking_positions: Vec<LockingPositionJSON>, // sum here to get total voting power
-    pub voting_power: U128String, // available voting power
-    pub vote_positions: Vec<VotePositionJSON>, // sum here to get used voting power
+    pub voting_power: U128String,                    // available voting power
+    pub vote_positions: Vec<VotePositionJSON>,       // sum here to get used voting power
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -66,6 +66,15 @@ impl Voter {
             }
         }
         result
+    }
+
+    // /** sum all voting power from locked positions */
+    pub(crate) fn sum_voting_power(&self) -> u128 {
+        self.locking_positions
+            .iter()
+            .filter(|locking_position| locking_position.is_locked())
+            .map(|locking_position| locking_position.voting_power)
+            .sum()
     }
 
     pub(crate) fn sum_used_votes(&self) -> u128 {
@@ -167,5 +176,4 @@ impl Voter {
             }
         }
     }
-
 }
