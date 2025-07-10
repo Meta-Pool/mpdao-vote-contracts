@@ -1,4 +1,5 @@
 use crate::{constants::*, locking_position::*, utils::*};
+use near_sdk::json_types::U128;
 use near_sdk::{
     assert_one_yocto,
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -862,7 +863,7 @@ impl MetaVoteContract {
         if extra_balance >= threshold {
             let extra = extra_balance.saturating_sub(NearToken::from_near(1).saturating_mul(5));
             Promise::new(self.owner_id.clone()).transfer(extra);
-            return extra.into();
+            return U128::from(extra.as_yoctonear());
         }
 
         return 0.into();
