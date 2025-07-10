@@ -106,17 +106,25 @@ impl Voter {
         self.locking_positions.swap_remove(index);
     }
 
+    //ARF
+    //In NEAR SDK 5.x, the type passed as an argument to .new(...) in UnorderedMap, Vector, etc., must implement the IntoStorageKey trait, which in turn requires BorshSerialize.
+    //Although you already have #[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)] applied, this is not enough on its own if you are passing a variant of the enum that contains data
+    //When you do this, hash_id has a dynamic value (Vec<u8> or similar), and BorshStorageKey does not automatically generate the BorshSerialize implementation for variants with non-trivial fields unless you explicitly tell it to.
+    //Use .try_to_vec().unwrap() como workaround converts the enum to a byte array (via Borsh), which does implement IntoStorageKey. It's a valid and secure solution, even used by the NEAR team.
+
     pub(crate) fn get_vote_position_for_address(
         &self,
         voter_id: &VoterId,
         contract_address: &ContractAddress,
     ) -> UnorderedMap<VotableObjId, u128> {
         let id = format!("{}-{}", voter_id.to_string(), contract_address.as_str());
-        self.vote_positions
-            .get(&contract_address)
-            .unwrap_or(UnorderedMap::new(StorageKey::VoterVotes {
+        self.vote_positions.get(&contract_address).unwrap_or(
+            UnorderedMap::new(StorageKey::VoterVotes {
                 hash_id: generate_hash_id(&id),
-            }))
+            })
+            .try_to_vec()
+            .unwrap(),
+        )
     }
 
     pub(crate) fn get_unlocked_position_indexes(&self) -> Vec<PositionIndex> {
