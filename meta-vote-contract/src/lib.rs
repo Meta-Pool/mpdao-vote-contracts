@@ -848,8 +848,9 @@ impl MetaVoteContract {
     // If extra NEAR balance (from buy_lock_and_vote)
     // transfer to owner
     pub fn transfer_extra_balance(&mut self) -> U128String {
-        let storage_cost =
-            env::storage_byte_cost() * NearToken::from_yoctonear(env::storage_usage() as u128);
+        let storage_cost = NearToken::from_yoctonear(
+            env::storage_byte_cost().as_yoctonear() * env::storage_usage() as u128,
+        );
 
         let extra_balance = env::account_balance() - storage_cost;
         if extra_balance >= 6 * NearToken::from_near(1) {
