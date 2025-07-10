@@ -1,8 +1,7 @@
 use crate::*;
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::borsh::BorshSerialize;
 use near_sdk::serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
-
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]
 #[serde(crate = "near_sdk::serde")]
 pub struct VoterJSON {
@@ -107,25 +106,34 @@ impl Voter {
         self.locking_positions.swap_remove(index);
     }
 
-    //ARF
-    //In NEAR SDK 5.x, the type passed as an argument to .new(...) in UnorderedMap, Vector, etc., must implement the IntoStorageKey trait, which in turn requires BorshSerialize.
-    //Although you already have #[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)] applied, this is not enough on its own if you are passing a variant of the enum that contains data
-    //When you do this, hash_id has a dynamic value (Vec<u8> or similar), and BorshStorageKey does not automatically generate the BorshSerialize implementation for variants with non-trivial fields unless you explicitly tell it to.
-    //Use .try_to_vec().unwrap() como workaround converts the enum to a byte array (via Borsh), which does implement IntoStorageKey. It's a valid and secure solution, even used by the NEAR team.
-
+    // ARF
+    // In NEAR SDK 5.x, .new(...) methods on structures like UnorderedMap or Vector
+    // require a key that implements IntoStorageKey, which usually means that the type also implements BorshSerialize.
+    //
+    // Even though #[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)] is derived, this is not always sufficient if you are using a variant of the StorageKey enum that contains data (e.g., hash_id: CryptoHash). In those cases, the macro does not automatically implement BorshSerialize for variants with complex fields, which causes compiler errors.
+    // //
+    // In previous releases, `.try_to_vec().unwrap()` was used as a workaround,
+    // which manually serialized the enum to a Vec<u8> using Borsh and thus satisfied
+    // the IntoStorageKey requirement. This practice is valid and accepted by the
+    // NEAR ecosystem, but it introduces explicit dependencies on the BorshSerialize trait.
+    //
+    // In this release, we prefer a simpler, more straightforward, and more robust solution:
+    // construct a unique string prefix and pass it as &[u8] to .new(...).
+    // This eliminates the need for manual serialization, avoids conflicts with derive
+    // and ensures compatibility with any dynamic key variant.
     pub(crate) fn get_vote_position_for_address(
         &self,
         voter_id: &VoterId,
         contract_address: &ContractAddress,
     ) -> UnorderedMap<VotableObjId, u128> {
-        let id = format!("{}-{}", voter_id.to_string(), contract_address.as_str());
-        self.vote_positions.get(&contract_address).unwrap_or(
-            UnorderedMap::new(StorageKey::VoterVotes {
-                hash_id: generate_hash_id(&id),
+        let id = format!("{}-{}", voter_id, contract_address);
+
+        self.vote_positions
+            .get(contract_address)
+            .unwrap_or_else(|| {
+                let prefix = format!("voter_votes:{}", id);
+                UnorderedMap::new(prefix.as_bytes())
             })
-            .try_to_vec()
-            .unwrap(),
-        )
     }
 
     pub(crate) fn get_unlocked_position_indexes(&self) -> Vec<PositionIndex> {
