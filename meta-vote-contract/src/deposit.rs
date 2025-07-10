@@ -1,4 +1,5 @@
 use crate::*;
+use near_contract_standards::fungible_token::Balance;
 use near_sdk::json_types::U128;
 use near_sdk::{env, log, near_bindgen, serde_json, PromiseOrValue};
 
