@@ -8,6 +8,6 @@ authors = ["metapool.app <hello@metapool.app>"]
 crate-type = ["cdylib"]
 
 [dependencies]
-near-sdk = "5.15.1"
+near-sdk = { version = "5.15.1", features = ["abi", "legacy"] }
 near-contract-standards = "5.15.1"
 uint = "0.9.3"
