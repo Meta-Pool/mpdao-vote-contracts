@@ -76,7 +76,7 @@ impl MetaVoteContract {
     pub(crate) fn transfer_mpdao_to_voter(&mut self, voter_id: &String, amount: MpDAOAmount) {
         ext_ft::ext(self.mpdao_token_contract_address.clone())
             .with_static_gas(GAS_FOR_FT_TRANSFER)
-            .with_attached_deposit(1)
+            .with_attached_deposit(NearToken::from_yoctonear(1))
             .ft_transfer(voter_id.clone(), U128::from(amount), None)
             .then(
                 Self::ext(env::current_account_id())
