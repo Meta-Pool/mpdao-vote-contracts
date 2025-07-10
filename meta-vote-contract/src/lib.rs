@@ -175,7 +175,7 @@ impl MetaVoteContract {
     #[payable]
     pub fn update_airdrop_user_data(&mut self, encrypted_data: &String) {
         assert!(
-            env::attached_deposit() == self.registration_cost,
+            env::attached_deposit() == NearToken::from_yoctonear(self.registration_cost),
             "Pay {} yoctos for the registration cost",
             self.registration_cost
         );
@@ -784,7 +784,7 @@ impl MetaVoteContract {
         self.assert_operator();
         // sanity check
         assert!(
-            mpdao_per_near_e24.0 >= NearToken::from_near(1),
+            mpdao_per_near_e24.0 >= NearToken::from_near(1).as_yoctonear(),
             "mpdao_per_near_e24 should be greater than ONE per NEAR"
         );
         self.mpdao_per_near_e24 = mpdao_per_near_e24.0;
@@ -805,7 +805,7 @@ impl MetaVoteContract {
     ) {
         // sanity check
         assert!(
-            self.mpdao_per_near_e24 >= NearToken::from_near(1),
+            self.mpdao_per_near_e24 >= NearToken::from_near(1).as_yoctonear(),
             "invalid mpdao_per_near_e24"
         );
         let amount_near = env::attached_deposit();
