@@ -858,12 +858,13 @@ impl MetaVoteContract {
                 .saturating_sub(storage_cost.as_yoctonear()),
         );
 
-        if extra_balance >= 6 * NearToken::from_near(1) {
-            // only if there's more than 6 NEAR to transfer, and leave 5 extra NEAR to backup the storage an extra 500kb
-            let extra = extra_balance - 5 * NearToken::from_near(1);
+        let threshold = NearToken::from_near(1).saturating_mul(6);
+        if extra_balance >= threshold {
+            let extra = extra_balance.saturating_sub(NearToken::from_near(1).saturating_mul(5));
             Promise::new(self.owner_id.clone()).transfer(extra);
             return extra.into();
         }
+
         return 0.into();
     }
 
