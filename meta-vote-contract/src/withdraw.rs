@@ -89,7 +89,6 @@ impl MetaVoteContract {
     pub fn after_transfer_mpdao_callback(&mut self, voter_id: VoterId, amount: U128) {
         let amount = amount.0;
         match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {
                 log!(
                     "WITHDRAW: {} mpDAO transfer to {}",
