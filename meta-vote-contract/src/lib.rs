@@ -5,7 +5,7 @@ use near_sdk::{
     collections::{unordered_map::UnorderedMap, Vector},
     env, log, near_bindgen, require,
     store::LookupMap,
-    AccountId, Balance, PanicOnDefault, Promise, ONE_NEAR,
+    AccountId, NearToken, PanicOnDefault, Promise,
 };
 use types::*;
 use voter::Voter;
@@ -784,7 +784,7 @@ impl MetaVoteContract {
         self.assert_operator();
         // sanity check
         assert!(
-            mpdao_per_near_e24.0 >= ONE_NEAR,
+            mpdao_per_near_e24.0 >= NearToken::from_near(1),
             "mpdao_per_near_e24 should be greater than ONE per NEAR"
         );
         self.mpdao_per_near_e24 = mpdao_per_near_e24.0;
@@ -805,17 +805,21 @@ impl MetaVoteContract {
     ) {
         // sanity check
         assert!(
-            self.mpdao_per_near_e24 >= ONE_NEAR,
+            self.mpdao_per_near_e24 >= NearToken::from_near(1),
             "invalid mpdao_per_near_e24"
         );
         let amount_near = env::attached_deposit();
         assert!(
-            amount_near >= ONE_NEAR / 100,
+            amount_near >= NearToken::from_near(1) / 100,
             "Minimum deposit amount is 0.01 NEAR."
         );
         let voter_id = env::predecessor_account_id().as_str().to_string();
         let mut voter = self.internal_get_voter(&voter_id);
-        let mpdao_amount_e24 = proportional(amount_near, self.mpdao_per_near_e24, ONE_NEAR);
+        let mpdao_amount_e24 = proportional(
+            amount_near,
+            self.mpdao_per_near_e24,
+            NearToken::from_near(1),
+        );
         let mpdao_amount = mpdao_amount_e24 / E18;
 
         assert!(
@@ -846,9 +850,9 @@ impl MetaVoteContract {
     pub fn transfer_extra_balance(&mut self) -> U128String {
         let storage_cost = env::storage_usage() as u128 * env::storage_byte_cost();
         let extra_balance = env::account_balance() - storage_cost;
-        if extra_balance >= 6 * ONE_NEAR {
+        if extra_balance >= 6 * NearToken::from_near(1) {
             // only if there's more than 6 NEAR to transfer, and leave 5 extra NEAR to backup the storage an extra 500kb
-            let extra = extra_balance - 5 * ONE_NEAR;
+            let extra = extra_balance - 5 * NearToken::from_near(1);
             Promise::new(self.owner_id.clone()).transfer(extra);
             return extra.into();
         }
