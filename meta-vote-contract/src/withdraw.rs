@@ -122,7 +122,7 @@ impl MetaVoteContract {
     ) -> Promise {
         ext_ft::ext(self.stnear_token_contract_address.clone())
             .with_static_gas(GAS_FOR_FT_TRANSFER)
-            .with_attached_deposit(1)
+            .with_attached_deposit(NearToken::from_yoctonear(1))
             .ft_transfer(receiver.clone(), U128::from(amount), None)
             .then(
                 Self::ext(env::current_account_id())
