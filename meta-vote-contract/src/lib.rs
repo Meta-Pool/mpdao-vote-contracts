@@ -810,7 +810,7 @@ impl MetaVoteContract {
         );
         let amount_near = env::attached_deposit();
         assert!(
-            amount_near >= NearToken::from_near(1) / 100,
+            amount_near >= NearToken::from_yoctonear(NearToken::from_near(1).as_yoctonear() / 100),
             "Minimum deposit amount is 0.01 NEAR."
         );
         let voter_id = env::predecessor_account_id().as_str().to_string();
