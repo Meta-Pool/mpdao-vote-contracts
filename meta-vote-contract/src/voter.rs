@@ -1,8 +1,9 @@
 use crate::*;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
+use schemars::JsonSchema;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 #[serde(crate = "near_sdk::serde")]
 pub struct VoterJSON {
     pub voter_id: String,

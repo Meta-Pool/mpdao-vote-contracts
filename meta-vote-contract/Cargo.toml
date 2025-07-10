@@ -11,3 +11,5 @@ crate-type = ["cdylib"]
 near-sdk = { version = "5.15.1", features = ["abi", "legacy"] }
 near-contract-standards = "5.15.1"
 uint = "0.9.3"
+schemars = { version = "0.8", features = ["derive"] }
+
