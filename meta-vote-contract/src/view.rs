@@ -6,7 +6,6 @@ use near_sdk::{
     collections::UnorderedMap,
     json_types::{U128, U64},
     near_bindgen,
-    serde::Serialize,
 };
 
 type U128String = U128;

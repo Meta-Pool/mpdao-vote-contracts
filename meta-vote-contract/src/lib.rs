@@ -24,7 +24,8 @@ mod voter;
 mod withdraw;
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "near_sdk::borsh")]
 pub struct MetaVoteContract {
     pub owner_id: AccountId,
     pub operator_id: AccountId,

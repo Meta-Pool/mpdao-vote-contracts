@@ -2,6 +2,7 @@ use crate::*;
 use near_sdk::{env, near_bindgen};
 
 #[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "near_sdk::borsh")]
 pub struct OldState {
     pub owner_id: AccountId,
     pub operator_id: AccountId,

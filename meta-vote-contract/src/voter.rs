@@ -11,8 +11,8 @@ pub struct VoterJSON {
     pub voting_power: U128String,                    // available voting power
     pub vote_positions: Vec<VotePositionJSON>,       // sum here to get used voting power
 }
-
 #[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "near_sdk::borsh")]
 pub struct Voter {
     pub balance: MpDAOAmount,
     pub locking_positions: Vector<LockingPosition>,
