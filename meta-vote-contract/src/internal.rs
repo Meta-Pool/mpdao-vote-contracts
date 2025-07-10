@@ -1,4 +1,5 @@
 use crate::*;
+use near_contract_standards::fungible_token::Balance;
 
 impl MetaVoteContract {
     pub(crate) fn assert_only_owner(&self) {
