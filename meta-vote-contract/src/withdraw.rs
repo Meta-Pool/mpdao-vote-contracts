@@ -140,7 +140,6 @@ impl MetaVoteContract {
     ) {
         let amount = amount.0;
         match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {
                 log!(
                     "{} WITHDRAWN {} stNEAR to {}",
