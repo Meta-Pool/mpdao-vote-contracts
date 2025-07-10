@@ -34,7 +34,7 @@ pub struct LockingPositionJSON {
     pub is_locked: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(crate = "near_sdk::serde")]
 pub struct VotableObjectJSON {
     pub votable_contract: String,
@@ -42,7 +42,7 @@ pub struct VotableObjectJSON {
     pub current_votes: U128,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 #[serde(crate = "near_sdk::serde")]
 pub struct VotePositionJSON {
     pub votable_address: String,
