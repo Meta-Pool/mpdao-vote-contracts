@@ -816,9 +816,9 @@ impl MetaVoteContract {
         let voter_id = env::predecessor_account_id().as_str().to_string();
         let mut voter = self.internal_get_voter(&voter_id);
         let mpdao_amount_e24 = proportional(
-            amount_near,
+            amount_near.as_yoctonear(),
             self.mpdao_per_near_e24,
-            NearToken::from_near(1),
+            NearToken::from_near(1).as_yoctonear(),
         );
         let mpdao_amount = mpdao_amount_e24 / E18;
 
