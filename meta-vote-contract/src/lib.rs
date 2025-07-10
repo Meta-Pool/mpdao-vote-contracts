@@ -852,7 +852,12 @@ impl MetaVoteContract {
             env::storage_byte_cost().as_yoctonear() * env::storage_usage() as u128,
         );
 
-        let extra_balance = env::account_balance() - storage_cost;
+        let extra_balance = NearToken::from_yoctonear(
+            env::account_balance()
+                .as_yoctonear()
+                .saturating_sub(storage_cost.as_yoctonear()),
+        );
+
         if extra_balance >= 6 * NearToken::from_near(1) {
             // only if there's more than 6 NEAR to transfer, and leave 5 extra NEAR to backup the storage an extra 500kb
             let extra = extra_balance - 5 * NearToken::from_near(1);
