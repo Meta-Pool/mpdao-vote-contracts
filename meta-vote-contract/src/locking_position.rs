@@ -1,7 +1,8 @@
 use crate::*;
 use near_sdk::json_types::U128;
+use near_sdk::borsh::{BorshSerialize, BorshDeserialize};
 
-#[derive(Clone)]
+#[derive(Clone, BorshSerialize)]
 #[near(serializers = [borsh])]
 pub struct LockingPosition {
     pub amount: MpDAOAmount,

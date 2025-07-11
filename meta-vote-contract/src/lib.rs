@@ -2,12 +2,8 @@ use crate::locking_position::*;
 use crate::{constants::*, locking_position::*, utils::*};
 use near_sdk::json_types::U128;
 use near_sdk::{
-    assert_one_yocto,
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    collections::{unordered_map::UnorderedMap, Vector},
-    env, log, near_bindgen, require,
-    store::LookupMap,
-    AccountId, NearToken, PanicOnDefault, Promise,
+    assert_one_yocto, collections::unordered_map::UnorderedMap, env, log, require,
+    store::vector::Vector, store::LookupMap, AccountId, NearToken, PanicOnDefault, Promise,
 };
 use types::*;
 use voter::Voter;
