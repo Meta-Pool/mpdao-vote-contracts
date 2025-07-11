@@ -1,5 +1,12 @@
+use crate::types::*;
 use crate::*;
 use near_sdk::CryptoHash;
+use uint::construct_uint;
+
+construct_uint! {
+    /// 256-bit unsigned integer.
+    pub struct U256(4);
+}
 
 #[inline]
 pub fn get_current_epoch_millis() -> EpochMillis {
@@ -31,7 +38,10 @@ pub fn pseudo_near_address(external_address: &String) -> String {
 }
 
 pub fn assert_at_least_1_mpdao(mpdao_amount: MpDAOAmount) {
-    assert!(mpdao_amount >= ONE_MPDAO, "amount should be at least 1 mpDAO"); // at least 1 mpDAO
+    assert!(
+        mpdao_amount >= ONE_MPDAO,
+        "amount should be at least 1 mpDAO"
+    ); // at least 1 mpDAO
 }
 
 /// Voting power is proportional to unbond_period
@@ -44,4 +54,3 @@ pub fn calculate_voting_power(mpdao_amount: MpDAOAmount, unbond_days: Days) -> u
     assert!(unbond_days < 3600); // put a limit to unbond_days
     proportional(base_vp, unbond_days.into(), 60) // apply multiplier
 }
-

@@ -1,3 +1,4 @@
+use crate::types::U128Json;
 use crate::types::*;
 use crate::{voter::VoterJSON, MetaVoteContract, MetaVoteContractExt, StorageKey};
 use near_sdk::serde::{Deserialize, Serialize};
@@ -7,7 +8,6 @@ use near_sdk::{
     near_bindgen,
 };
 use schemars::JsonSchema;
-
 type U128String = U128;
 
 /**********************/
@@ -23,20 +23,20 @@ pub struct ContractInfoJson {
     pub min_unbond_period: u16,
     pub min_claim_and_bond_days: u16,
     pub max_unbond_period: u16,
-    pub min_deposit_amount: U128String,
+    pub min_deposit_amount: U128Json,
     pub max_locking_positions: u8,
     pub max_voting_positions: u8,
     pub mpdao_token_contract_address: String,
     pub stnear_token_contract_address: String,
-    pub registration_cost: U128String,
+    pub registration_cost: U128Json,
     pub prev_governance_contract: String,
-    pub accumulated_mpdao_distributed_for_claims: U128String,
-    pub total_unclaimed_mpdao: U128String,
-    pub accum_distributed_stnear_for_claims: U128String,
-    pub total_unclaimed_stnear: U128String,
+    pub accumulated_mpdao_distributed_for_claims: U128Json,
+    pub total_unclaimed_mpdao: U128Json,
+    pub accum_distributed_stnear_for_claims: U128Json,
+    pub total_unclaimed_stnear: U128Json,
     pub evm_delegates_count: u64,
-    pub mpdao_per_near_e24: U128String,
-    pub mpdao_avail_to_sell: U128String,
+    pub mpdao_per_near_e24: U128Json,
+    pub mpdao_avail_to_sell: U128Json,
 }
 
 #[near_bindgen]

@@ -55,9 +55,9 @@ impl LockingPosition {
     pub(crate) fn to_json(&self, index: Option<PositionIndex>) -> LockingPositionJSON {
         LockingPositionJSON {
             index,
-            amount: U128::from(self.amount),
+            amount: U128Json(U128::from(self.amount)),
             locking_period: self.locking_period,
-            voting_power: U128::from(self.voting_power),
+            voting_power: U128Json(U128::from(self.amount)),
             unlocking_started_at: self.unlocking_started_at,
             is_unlocked: self.is_unlocked(),
             is_unlocking: self.is_unlocking(),

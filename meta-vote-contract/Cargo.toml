@@ -13,3 +13,4 @@ near-contract-standards = { version = "5.15.1", default-features = false }
 uint = "0.9.3"
 schemars = { version = "0.8.16", features = ["derive"] }
 near-abi = "0.1.0-pre.0"
+serde = { version = "1.0", features = ["derive"] }
