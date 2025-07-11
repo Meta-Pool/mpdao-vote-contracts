@@ -5,7 +5,6 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     collections::UnorderedMap,
     json_types::{U128, U64},
-    near_bindgen,
 };
 use schemars::JsonSchema;
 type U128String = U128;
@@ -39,6 +38,7 @@ pub struct ContractInfoJson {
     pub mpdao_avail_to_sell: U128Json,
 }
 
+#[near]
 impl MetaVoteContract {
     pub fn get_owner_id(&self) -> String {
         self.owner_id.to_string()
