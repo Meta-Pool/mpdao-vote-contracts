@@ -1,9 +1,4 @@
 use near_sdk::json_types::U128;
-use near_sdk::serde::{Deserialize, Serialize};
-use schemars::{
-    schema::{InstanceType, Schema, SchemaObject},
-    JsonSchema,
-};
 use uint::construct_uint;
 
 pub type U128String = U128;
@@ -17,6 +12,10 @@ pub type EvmSignature = String;
 pub type EpochMillis = u64;
 pub type PositionIndex = u64;
 
+construct_uint! {
+    /// 256-bit unsigned integer
+    pub struct U256(4);
+}
 #[derive(Debug)]
 #[near(serializers = [json])]
 pub struct LockingPositionJSON {
