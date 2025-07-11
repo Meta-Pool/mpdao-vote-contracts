@@ -1,8 +1,7 @@
 use crate::*;
-use near_sdk::{env, near_bindgen};
+use near_sdk::env;
 
-#[derive(BorshDeserialize, BorshSerialize)]
-#[borsh(crate = "near_sdk::borsh")]
+#[near(serializers = [borsh])]
 pub struct OldState {
     pub owner_id: AccountId,
     pub operator_id: AccountId,
