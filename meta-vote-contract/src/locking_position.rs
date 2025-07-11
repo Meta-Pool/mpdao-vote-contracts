@@ -1,10 +1,9 @@
 use crate::*;
 use near_sdk::json_types::U128;
-use near_sdk::borsh::{BorshSerialize, BorshDeserialize};
 
-#[derive(Clone, BorshSerialize)]
+#[derive(Clone, Debug)]
 #[near(serializers = [borsh])]
-pub struct LockingPosition {
+pub(crate) struct LockingPosition {
     pub amount: MpDAOAmount,
     pub locking_period: Days,
     pub voting_power: u128,
@@ -51,9 +50,9 @@ impl LockingPosition {
     pub(crate) fn to_json(&self, index: Option<PositionIndex>) -> LockingPositionJSON {
         LockingPositionJSON {
             index,
-            amount: U128Json(U128::from(self.amount)),
+            amount: U128::from(self.amount),
             locking_period: self.locking_period,
-            voting_power: U128Json(U128::from(self.amount)),
+            voting_power: U128::from(self.amount),
             unlocking_started_at: self.unlocking_started_at,
             is_unlocked: self.is_unlocked(),
             is_unlocking: self.is_unlocking(),
@@ -66,7 +65,7 @@ impl MetaVoteContract {
     fn increase_locking_position(
         &mut self,
         voter: &mut Voter,
-        index: u64,
+        index: u32,
         mpdao_amount: MpDAOAmount,
         unbond_days: Days,
     ) {
@@ -75,7 +74,7 @@ impl MetaVoteContract {
         current_position.amount += mpdao_amount;
         current_position.voting_power += voting_power;
 
-        voter.locking_positions.replace(index, &current_position);
+        voter.locking_positions.replace(index, current_position);
         voter.available_voting_power += voting_power;
         self.total_voting_power += voting_power;
     }
@@ -99,7 +98,7 @@ impl MetaVoteContract {
         );
         let voting_power = utils::calculate_voting_power(mpdao_amount, unbond_days);
         let locking_position = LockingPosition::new(mpdao_amount, unbond_days, voting_power, None);
-        voter.locking_positions.push(&locking_position);
+        voter.locking_positions.push(locking_position);
         voter.available_voting_power += voting_power;
         self.total_voting_power += voting_power;
     }
@@ -151,6 +150,6 @@ impl MetaVoteContract {
             voting_power,
             Some(get_current_epoch_millis()),
         );
-        voter.locking_positions.push(&unlocking_position);
+        voter.locking_positions.push(unlocking_position);
     }
 }

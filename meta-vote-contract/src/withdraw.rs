@@ -1,7 +1,5 @@
 use crate::interface::*;
 use crate::*;
-//use near_contract_standards::fungible_token::receiver;
-use near_sdk::{assert_one_yocto, json_types::U128, near_bindgen, Promise, PromiseResult};
 
 #[near]
 impl MetaVoteContract {
@@ -45,7 +43,7 @@ impl MetaVoteContract {
     pub fn withdraw(
         &mut self,
         position_index_list: Vec<PositionIndex>,
-        amount_from_balance: U128String,
+        amount_from_balance: U128,
     ) {
         let amount_to_withdraw = amount_from_balance.0;
         let voter_id = env::predecessor_account_id().as_str().to_string();
@@ -105,7 +103,7 @@ impl MetaVoteContract {
         };
     }
 
-    fn restore_transfer_to_mpdao(&mut self, amount: Balance, voter_id: VoterId) {
+    fn restore_transfer_to_mpdao(&mut self, amount: u128, voter_id: VoterId) {
         let mut voter = self.internal_get_voter(&voter_id);
         voter.balance += amount;
         self.voters.insert(&voter_id, &voter);
@@ -116,7 +114,7 @@ impl MetaVoteContract {
         &self,
         source_voter: &String,
         receiver: &String,
-        amount: Balance,
+        amount: u128,
     ) -> Promise {
         ext_ft::ext(self.stnear_token_contract_address.clone())
             .with_static_gas(GAS_FOR_FT_TRANSFER)

@@ -14,7 +14,7 @@ impl MetaVoteContract {
     pub fn pre_delegate_evm_address(&mut self, evm_address: String, signature: String) {
         assert_one_yocto();
         // minimal checks to avoid common mistakes (e.g. send with .evmp.near)
-        assert!(
+        require!(
             !evm_address.contains("."),
             "evm_address can not contain dots"
         );
@@ -78,7 +78,7 @@ impl MetaVoteContract {
     pub fn delegated_claim_stnear(
         &mut self,
         evm_address: EvmAddress,
-        amount: U128String,
+        amount: U128,
     ) -> Promise {
         assert_one_yocto();
         // verify delegation and compose the pseudo near account
@@ -103,7 +103,7 @@ impl MetaVoteContract {
     pub fn delegated_claim_and_bond_mpdao(
         &mut self,
         evm_address: EvmAddress,
-        amount: U128String,
+        amount: U128,
         locking_period: u16,
     ) {
         assert_one_yocto();
@@ -138,7 +138,7 @@ impl MetaVoteContract {
     pub fn vote_delegated(
         &mut self,
         evm_address: EvmAddress,
-        voting_power: U128String,
+        voting_power: U128,
         contract_address: ContractAddress,
         votable_object_id: VotableObjId,
     ) {

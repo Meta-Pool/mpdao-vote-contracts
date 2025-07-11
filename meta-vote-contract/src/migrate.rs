@@ -44,7 +44,7 @@ pub struct OldState {
     pub mpdao_avail_to_sell: u128,
 }
 
-#[near_bindgen]
+#[near]
 impl MetaVoteContract {
     #[init(ignore_state)]
     #[private] // only contract account can call this fn

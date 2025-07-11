@@ -1,7 +1,6 @@
-use near_sdk::json_types::U128;
+use crate::*;
 use uint::construct_uint;
 
-pub type U128String = U128;
 pub type VoterId = String;
 pub type Days = u16;
 pub type MpDAOAmount = u128;
@@ -10,7 +9,7 @@ pub type VotableObjId = String;
 pub type EvmAddress = String;
 pub type EvmSignature = String;
 pub type EpochMillis = u64;
-pub type PositionIndex = u64;
+pub type PositionIndex = u32;
 
 construct_uint! {
     /// 256-bit unsigned integer

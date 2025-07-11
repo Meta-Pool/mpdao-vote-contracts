@@ -82,8 +82,8 @@ impl Voter {
         result
     }
 
-    pub(crate) fn find_locked_position(&self, unbond_days: Days) -> Option<u64> {
-        let mut index = 0_u64;
+    pub(crate) fn find_locked_position(&self, unbond_days: Days) -> Option<u32> {
+        let mut index = 0_u32;
         for locking_position in self.locking_positions.iter() {
             if locking_position.locking_period == unbond_days && locking_position.is_locked() {
                 return Some(index);
@@ -94,9 +94,7 @@ impl Voter {
     }
 
     pub(crate) fn get_position(&self, index: PositionIndex) -> LockingPosition {
-        self.locking_positions
-            .get(index)
-            .expect("Index out of range!")
+        self.locking_positions.get(index).expect("IndexOutOfRange").clone()
     }
 
     pub(crate) fn remove_position(&mut self, index: PositionIndex) {
@@ -120,10 +118,7 @@ impl Voter {
     pub(crate) fn get_unlocked_position_indexes(&self) -> Vec<PositionIndex> {
         let mut result = Vec::new();
         for index in 0..self.locking_positions.len() {
-            let locking_position = self
-                .locking_positions
-                .get(index)
-                .expect("Locking position not found!");
+            let locking_position = self.locking_positions.get(index).expect("Locking position not found!");
             if locking_position.is_unlocked() {
                 result.push(index);
             }

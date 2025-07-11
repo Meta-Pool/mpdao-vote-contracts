@@ -26,6 +26,7 @@ impl MetaVoteContract {
     pub(crate) fn internal_get_voter(&self, voter_id: &String) -> Voter {
         self.voters.get(&voter_id).unwrap_or(Voter::new(&voter_id))
     }
+
     pub(crate) fn internal_get_voter_or_panic(&self, voter_id: &String) -> Voter {
         match self.voters.get(&voter_id) {
             Some(a) => a,

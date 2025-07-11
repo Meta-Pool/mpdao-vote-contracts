@@ -1,8 +1,9 @@
+use  crate::*;
 use near_sdk::{BorshStorageKey, CryptoHash, Gas, NearToken};
 
 pub const ONE_MPDAO: u128 = 1_000_000; // MPDAO has 6 decimals
 pub const E18: u128 = 1_000_000_000_000_000_000; // to convert 6 decimals to 24 decimals
-pub const ONE_NEAR: NearToken = NearToken::from_near(1).as_yoctonear(); // 1 NEAR in yoctoNEAR
+pub const ONE_NEAR: NearToken = NearToken::from_near(1); // 1 NEAR in yoctoNEAR
 
 /// Amount of gas for fungible token transfers.
 ///

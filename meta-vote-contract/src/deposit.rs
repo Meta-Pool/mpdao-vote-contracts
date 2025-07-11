@@ -28,11 +28,9 @@ impl FungibleTokenReceiver for MetaVoteContract {
         }
         // else, user deposit of mpDAO to bond for x days
         else {
-            assert_eq!(
-                env::predecessor_account_id(),
-                self.mpdao_token_contract_address,
-                "You can only bond mpDAO-token, contract:{}",
-                self.mpdao_token_contract_address.to_string()
+            require!(
+                env::predecessor_account_id() == self.mpdao_token_contract_address,
+                "You can only bond mpDAO-token",
             );
             let (voter_id, days) = if msg.len() >= 1 && &msg[..1] == "[" {
                 // deposit & bond for others
@@ -95,7 +93,7 @@ impl MetaVoteContract {
             }
             self.accum_distributed_stnear_for_claims += total_distributed;
         } else {
-            panic!("Unknown token address: {}", token_address);
+            env::panic_str("UnknownTokenAddress");
         }
         assert!(
             total_distributed == total_amount,
