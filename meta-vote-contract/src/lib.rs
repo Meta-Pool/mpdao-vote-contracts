@@ -74,6 +74,7 @@ pub struct MetaVoteContract {
     pub min_claim_and_bond_days: u16,
 }
 
+#[near_bindgen]
 impl MetaVoteContract {
     #[init]
     pub fn new(
