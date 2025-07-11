@@ -25,9 +25,8 @@ mod view;
 mod voter;
 mod withdraw;
 
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
-#[borsh(crate = "near_sdk::borsh")]
+#[near(contract_state)]
+#[derive(PanicOnDefault)]
 pub struct MetaVoteContract {
     pub owner_id: AccountId,
     pub operator_id: AccountId,
@@ -74,7 +73,7 @@ pub struct MetaVoteContract {
     pub min_claim_and_bond_days: u16,
 }
 
-#[near_bindgen]
+#[near]
 impl MetaVoteContract {
     #[init]
     pub fn new(

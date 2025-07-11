@@ -1,19 +1,17 @@
 use crate::*;
+use near_sdk::assert_one_yocto;
 use near_sdk::NearToken;
-use near_sdk::{assert_one_yocto, near_bindgen};
 
+#[near]
 impl MetaVoteContract {
     // ************************
     // * Delegate EVM address *
     // ************************
 
+    #[payable]
     /// called from the user account, with a ECDSA signature (ethereum signatures & the evm account)
     /// if confirmed by the operator, it moves to "delegated"
     pub fn pre_delegate_evm_address(&mut self, evm_address: String, signature: String) {
-        let deposit = env::attached_deposit();
-        if deposit == NearToken::from_yoctonear(0) {
-            env::panic_str("Must attach a deposit to call this method");
-        }
         assert_one_yocto();
         // minimal checks to avoid common mistakes (e.g. send with .evmp.near)
         assert!(
@@ -29,21 +27,15 @@ impl MetaVoteContract {
         self.evm_pre_delegation.get(&evm_address)
     }
 
+    #[payable]
     pub fn operator_remove_pre_delegate_evm_address(&mut self, evm_address: String) {
-        let deposit = env::attached_deposit();
-        if deposit == NearToken::from_yoctonear(0) {
-            env::panic_str("Must attach a deposit to call this method");
-        }
         assert_one_yocto();
         self.assert_operator();
         self.evm_pre_delegation.remove(&evm_address);
     }
 
+    #[payable]
     pub fn operator_confirm_delegated_evm_address(&mut self, evm_address: String) {
-        let deposit = env::attached_deposit();
-        if deposit == NearToken::from_yoctonear(0) {
-            env::panic_str("Must attach a deposit to call this method");
-        }
         assert_one_yocto();
         self.assert_operator();
         if let Some(pre_delegation) = self.evm_pre_delegation.remove(&evm_address) {
@@ -82,15 +74,12 @@ impl MetaVoteContract {
         }
     }
 
+    #[payable]
     pub fn delegated_claim_stnear(
         &mut self,
         evm_address: EvmAddress,
         amount: U128String,
     ) -> Promise {
-        let deposit = env::attached_deposit();
-        if deposit == NearToken::from_yoctonear(0) {
-            env::panic_str("Must attach a deposit to call this method");
-        }
         assert_one_yocto();
         // verify delegation and compose the pseudo near account
         let pseudo_account = self.verify_delegate(&evm_address);
@@ -110,16 +99,13 @@ impl MetaVoteContract {
         // )
     }
 
+    #[payable]
     pub fn delegated_claim_and_bond_mpdao(
         &mut self,
         evm_address: EvmAddress,
         amount: U128String,
         locking_period: u16,
     ) {
-        let deposit = env::attached_deposit();
-        if deposit == NearToken::from_yoctonear(0) {
-            env::panic_str("Must attach a deposit to call this method");
-        }
         assert_one_yocto();
         // verify delegation and compose the pseudo near account
         let pseudo_account = self.verify_delegate(&evm_address);
@@ -177,11 +163,8 @@ impl MetaVoteContract {
         self.internal_unvote(&pseudo_account, &contract_address, &votable_object_id)
     }
 
+    #[payable]
     pub fn remove_delegated_evm_address(&mut self, evm_address: String) {
-        let deposit = env::attached_deposit();
-        if deposit == NearToken::from_yoctonear(0) {
-            env::panic_str("Must attach a deposit to call this method");
-        }
         assert_one_yocto();
         if let Some(existing_delegation) = self.evm_delegation_signatures.get(&evm_address) {
             let predecessor = env::predecessor_account_id().as_str().to_string();
