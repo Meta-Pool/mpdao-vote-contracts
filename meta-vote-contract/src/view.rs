@@ -39,7 +39,6 @@ pub struct ContractInfoJson {
     pub mpdao_avail_to_sell: U128Json,
 }
 
-#[near_bindgen]
 impl MetaVoteContract {
     pub fn get_owner_id(&self) -> String {
         self.owner_id.to_string()
