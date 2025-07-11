@@ -7,7 +7,6 @@ use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 
 const E20: Balance = 100_000_000_000_000_000_000;
 
-#[near_bindgen]
 impl FungibleTokenReceiver for MetaVoteContract {
     // receiving mpDAO or stNEAR to distribute
     // verifies the caller is mpdao_token_contract_address or stnear_token_contract_address
