@@ -103,21 +103,6 @@ impl Voter {
         self.locking_positions.swap_remove(index);
     }
 
-    // ARF
-    // In NEAR SDK 5.x, .new(...) methods on structures like UnorderedMap or Vector
-    // require a key that implements IntoStorageKey, which usually means that the type also implements BorshSerialize.
-    //
-    // Even though #[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)] is derived, this is not always sufficient if you are using a variant of the StorageKey enum that contains data (e.g., hash_id: CryptoHash). In those cases, the macro does not automatically implement BorshSerialize for variants with complex fields, which causes compiler errors.
-    // //
-    // In previous releases, `.try_to_vec().unwrap()` was used as a workaround,
-    // which manually serialized the enum to a Vec<u8> using Borsh and thus satisfied
-    // the IntoStorageKey requirement. This practice is valid and accepted by the
-    // NEAR ecosystem, but it introduces explicit dependencies on the BorshSerialize trait.
-    //
-    // In this release, we prefer a simpler, more straightforward, and more robust solution:
-    // construct a unique string prefix and pass it as &[u8] to .new(...).
-    // This eliminates the need for manual serialization, avoids conflicts with derive
-    // and ensures compatibility with any dynamic key variant.
     pub(crate) fn get_vote_position_for_address(
         &self,
         voter_id: &VoterId,
