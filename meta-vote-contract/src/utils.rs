@@ -1,12 +1,5 @@
-use crate::types::*;
 use crate::*;
 use near_sdk::CryptoHash;
-use uint::construct_uint;
-
-construct_uint! {
-    /// 256-bit unsigned integer.
-    pub struct U256(4);
-}
 
 #[inline]
 pub fn get_current_epoch_millis() -> EpochMillis {
