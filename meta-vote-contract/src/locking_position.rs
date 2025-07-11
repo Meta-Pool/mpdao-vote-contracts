@@ -5,7 +5,6 @@ use near_sdk::serde::{Deserialize, Serialize};
 
 //ARF
 //NEAR SDK re-exports its own version of borsh, and by using #[derive(BorshDeserialize)] without specifying #[borsh(crate = "near_sdk::borsh")], the compiler may look for the derive in the global borsh or another version — which breaks the macro.
-#[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone)]
 #[borsh(crate = "near_sdk::borsh")]
 #[serde(crate = "near_sdk::serde")]

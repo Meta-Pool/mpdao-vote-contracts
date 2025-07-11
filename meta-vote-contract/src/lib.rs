@@ -1,3 +1,4 @@
+use crate::locking_position::*;
 use crate::{constants::*, locking_position::*, utils::*};
 use near_sdk::json_types::U128;
 use near_sdk::{

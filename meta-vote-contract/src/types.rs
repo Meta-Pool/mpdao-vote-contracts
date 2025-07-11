@@ -1,6 +1,5 @@
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
-use schemars::JsonSchema;
 use uint::construct_uint;
 
 pub type U128String = U128;
@@ -21,7 +20,7 @@ construct_uint! {
     pub struct U256(4);
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct LockingPositionJSON {
     pub index: Option<PositionIndex>,
@@ -34,7 +33,7 @@ pub struct LockingPositionJSON {
     pub is_locked: bool,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct VotableObjectJSON {
     pub votable_contract: String,
@@ -42,7 +41,7 @@ pub struct VotableObjectJSON {
     pub current_votes: U128,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct VotePositionJSON {
     pub votable_address: String,

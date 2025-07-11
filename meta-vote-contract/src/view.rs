@@ -1,6 +1,5 @@
 use crate::types::*;
 use crate::{voter::VoterJSON, MetaVoteContract, MetaVoteContractExt, StorageKey};
-use near_sdk::schemars::JsonSchema;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     collections::UnorderedMap,
@@ -14,13 +13,8 @@ type U128String = U128;
 /*   View functions   */
 /**********************/
 
-//ARF
-//You are using near-sdk 5.x with ABI generation enabled, which requires that types returned by #[near_bindgen] functions implement JsonSchema from the near_sdk::schemars crate, not the global schemars.
-//This implies: Explicitly import the derive from near_sdk
-
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
-#[schemars(crate = "near_sdk::schemars")]
 pub struct ContractInfoJson {
     pub owner_id: String,
     pub operator_id: String,
