@@ -1,9 +1,9 @@
 use crate::interface::*;
 use crate::*;
 //use near_contract_standards::fungible_token::receiver;
-use near_contract_standards::fungible_token::Balance;
 use near_sdk::{assert_one_yocto, json_types::U128, near_bindgen, Promise, PromiseResult};
 
+#[near]
 impl MetaVoteContract {
     // ************
     // * Withdraw *
@@ -83,13 +83,8 @@ impl MetaVoteContract {
                     .after_transfer_mpdao_callback(voter_id.clone(), U128::from(amount)),
             );
     }
-
+    #[private]
     pub fn after_transfer_mpdao_callback(&mut self, voter_id: VoterId, amount: U128) {
-        assert_eq!(
-            env::predecessor_account_id(),
-            env::current_account_id(),
-            "This method is private and can only be called by the contract itself"
-        );
         let amount = amount.0;
         match env::promise_result(0) {
             PromiseResult::Successful(_) => {
@@ -134,17 +129,13 @@ impl MetaVoteContract {
             )
     }
 
+    #[private]
     pub fn after_transfer_stnear_callback(
         &mut self,
         source_voter: &String,
         receiver: &String,
         amount: U128,
     ) {
-        assert_eq!(
-            env::predecessor_account_id(),
-            env::current_account_id(),
-            "This method is private and can only be called by the contract itself"
-        );
         let amount = amount.0;
         match env::promise_result(0) {
             PromiseResult::Successful(_) => {
