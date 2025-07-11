@@ -1,9 +1,7 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{BorshStorageKey, CryptoHash, Gas};
 
 pub const ONE_MPDAO: u128 = 1_000_000; // MPDAO has 6 decimals
 pub const E18: u128 = 1_000_000_000_000_000_000; // to convert 6 decimals to 24 decimals
-pub const TGAS: u64 = 1_000_000_000_000;
 
 /// Amount of gas for fungible token transfers.
 ///
