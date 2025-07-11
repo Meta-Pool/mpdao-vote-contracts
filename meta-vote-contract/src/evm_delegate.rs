@@ -1,6 +1,5 @@
 use crate::*;
 use near_sdk::assert_one_yocto;
-use near_sdk::NearToken;
 
 #[near]
 impl MetaVoteContract {
@@ -180,10 +179,10 @@ impl MetaVoteContract {
                 self.evm_delegates
                     .insert(&predecessor, &delegated_addresses);
             } else {
-                panic!("note delegated to you");
+                env::panic_str("note delegated to you");
             }
         } else {
-            panic!("note delegated");
+            env::panic_str("note delegated");
         }
     }
 

@@ -3,7 +3,7 @@ use near_sdk::json_types::U128;
 
 #[derive(Clone, Debug)]
 #[near(serializers = [borsh])]
-pub(crate) struct LockingPosition {
+pub struct LockingPosition {
     pub amount: MpDAOAmount,
     pub locking_period: Days,
     pub voting_power: u128,

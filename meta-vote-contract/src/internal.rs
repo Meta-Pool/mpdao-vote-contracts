@@ -26,7 +26,7 @@ impl MetaVoteContract {
     pub(crate) fn internal_get_voter_or_panic(&self, voter_id: &String) -> Voter {
         match self.voters.get(&voter_id) {
             Some(a) => a,
-            _ => panic!("invalid voter_id {}", voter_id),
+            _ => env::panic_str("InvalidVoterId"),
         }
     }
 
@@ -102,7 +102,7 @@ impl MetaVoteContract {
         total_unclaimed: &mut u128,
         account: &String,
         amount: u128,
-        token: &str,
+        _token: &str,
     ) {
         let existing_claimable_amount = claimable_map.get(&account).unwrap_or_default();
         require!(existing_claimable_amount >= amount, "NotEnoughClaimableTokens");

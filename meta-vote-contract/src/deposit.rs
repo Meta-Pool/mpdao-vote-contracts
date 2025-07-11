@@ -23,7 +23,7 @@ impl FungibleTokenReceiver for MetaVoteContract {
         if msg.len() >= 11 && &msg[..11] == "for-claims:" {
             match serde_json::from_str(&msg[11..]) {
                 Ok(info) => self.distribute_for_claims(amount, &info),
-                Err(_) => panic!("Err parsing msg for-claims"),
+                Err(_) => env::panic_str("Err parsing msg for-claims"),
             };
         }
         // else, user deposit of mpDAO to bond for x days
@@ -40,14 +40,14 @@ impl FungibleTokenReceiver for MetaVoteContract {
                         voter_and_days // assign to voter_id, days
                     }
                     Err(_) => {
-                        panic!("Err parsing msg, expected [voter_id,days]")
+                        env::panic_str("Err parsing msg, expected [voter_id,days]")
                     }
                 }
             } else {
                 // self-deposit & bond
                 match msg.parse::<Days>() {
                     Ok(days) => (sender_id.to_string(), days),
-                    Err(_) => panic!("Err parsing bonding_days from msg. Must be u16"),
+                    Err(_) => env::panic_str("Err parsing bonding_days from msg. Must be u16"),
                 }
             };
 

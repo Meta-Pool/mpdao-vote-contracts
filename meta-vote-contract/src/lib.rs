@@ -4,8 +4,6 @@ use near_sdk::{
     collections::unordered_map::UnorderedMap,
     env, log, require,
     near,
-    serde::{Deserialize, Serialize},
-    serde_json,
     store::Vector,
     store::LookupMap, AccountId, NearToken, PanicOnDefault, Promise, PromiseResult,
 };
@@ -739,9 +737,11 @@ impl MetaVoteContract {
             {
                 let votable_object_id_filter = format!(" #{} ", self.lock_votes_in_numeric_id);
                 if votable_object_id.contains(&votable_object_id_filter) {
-                    panic!(
-                        "you can not remove votes here until timestamp_ms {}",
-                        self.lock_votes_in_end_timestamp_ms
+                    env::panic_str(
+                        &format!(
+                            "you can not remove votes here until timestamp_ms {}",
+                            self.lock_votes_in_end_timestamp_ms
+                        )
                     )
                 }
             }
