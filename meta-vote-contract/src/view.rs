@@ -1,6 +1,5 @@
 use crate::types::*;
 use crate::{voter::VoterJSON, MetaVoteContract, MetaVoteContractExt, StorageKey};
-use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     collections::UnorderedMap,
     json_types::{U128, U64},

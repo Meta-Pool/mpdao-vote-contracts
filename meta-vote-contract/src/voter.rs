@@ -123,14 +123,13 @@ impl Voter {
         voter_id: &VoterId,
         contract_address: &ContractAddress,
     ) -> UnorderedMap<VotableObjId, u128> {
-        let id = format!("{}-{}", voter_id, contract_address);
+        let id = format!("{}-{}", voter_id.to_string(), contract_address.as_str());
 
         self.vote_positions
             .get(contract_address)
-            .unwrap_or_else(|| {
-                let prefix = format!("voter_votes:{}", id);
-                UnorderedMap::new(prefix.as_bytes())
-            })
+            .unwrap_or(UnorderedMap::new(StorageKey::VoterVotes {
+                hash_id: generate_hash_id(&id),
+            }))
     }
 
     pub(crate) fn get_unlocked_position_indexes(&self) -> Vec<PositionIndex> {
