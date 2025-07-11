@@ -6,9 +6,9 @@ use schemars::JsonSchema;
 #[serde(crate = "near_sdk::serde")]
 pub struct VoterJSON {
     pub voter_id: String,
-    pub balance_in_contract: U128String,
+    pub balance_in_contract: U128Json,
     pub locking_positions: Vec<LockingPositionJSON>, // sum here to get total voting power
-    pub voting_power: U128String,                    // available voting power
+    pub voting_power: U128Json,                      // available voting power
     pub vote_positions: Vec<VotePositionJSON>,       // sum here to get used voting power
 }
 #[derive(BorshDeserialize, BorshSerialize)]
