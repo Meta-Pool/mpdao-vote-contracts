@@ -1,18 +1,15 @@
 use crate::*;
-use near_sdk::borsh::BorshSerialize;
-use near_sdk::serde::{Deserialize, Serialize};
-use schemars::JsonSchema;
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
-#[serde(crate = "near_sdk::serde")]
+#[derive(Debug)]
+#[near(serializers = [json])]
 pub struct VoterJSON {
     pub voter_id: String,
-    pub balance_in_contract: U128Json,
+    pub balance_in_contract: U128,
     pub locking_positions: Vec<LockingPositionJSON>, // sum here to get total voting power
-    pub voting_power: U128Json,                      // available voting power
+    pub voting_power: U128,                          // available voting power
     pub vote_positions: Vec<VotePositionJSON>,       // sum here to get used voting power
 }
-#[derive(BorshDeserialize, BorshSerialize)]
-#[borsh(crate = "near_sdk::borsh")]
+#[derive(Debug)]
+#[near(serializers = [borsh])]
 pub struct Voter {
     pub balance: MpDAOAmount,
     pub locking_positions: Vector<LockingPosition>,
