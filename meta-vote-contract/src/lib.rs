@@ -785,7 +785,7 @@ impl MetaVoteContract {
         self.assert_operator();
         // sanity check
         assert!(
-            mpdao_per_near_e24.0 >= NearToken::from_near(1).as_yoctonear(),
+            mpdao_per_near_e24.0 >= ONE_NEAR,
             "mpdao_per_near_e24 should be greater than ONE per NEAR"
         );
         self.mpdao_per_near_e24 = mpdao_per_near_e24.0;
@@ -806,12 +806,12 @@ impl MetaVoteContract {
     ) {
         // sanity check
         assert!(
-            self.mpdao_per_near_e24 >= NearToken::from_near(1).as_yoctonear(),
+            self.mpdao_per_near_e24 >= ONE_NEAR,
             "invalid mpdao_per_near_e24"
         );
         let amount_near = env::attached_deposit();
         assert!(
-            amount_near >= NearToken::from_yoctonear(NearToken::from_near(1).as_yoctonear() / 100),
+            amount_near >= NearToken::from_yoctonear(ONE_NEAR / 100),
             "Minimum deposit amount is 0.01 NEAR."
         );
         let voter_id = env::predecessor_account_id().as_str().to_string();
@@ -819,7 +819,7 @@ impl MetaVoteContract {
         let mpdao_amount_e24 = proportional(
             amount_near.as_yoctonear(),
             self.mpdao_per_near_e24,
-            NearToken::from_near(1).as_yoctonear(),
+            ONE_NEAR,
         );
         let mpdao_amount = mpdao_amount_e24 / E18;
 
@@ -848,22 +848,20 @@ impl MetaVoteContract {
 
     // If extra NEAR balance (from buy_lock_and_vote)
     // transfer to owner
-    pub fn transfer_extra_balance(&mut self) -> U128String {
-        let storage_cost = NearToken::from_yoctonear(
-            env::storage_byte_cost().as_yoctonear() * env::storage_usage() as u128,
-        );
+    pub fn transfer_extra_balance(&mut self) -> U128 {
+        let storage_cost = env::storage_byte_cost()
+            .checked_mul(env::storage_usage())
+            .expect("invalid cost");
 
-        let extra_balance = NearToken::from_yoctonear(
-            env::account_balance()
-                .as_yoctonear()
-                .saturating_sub(storage_cost.as_yoctonear()),
-        );
+        let extra_balance = env::account_balance().saturating_sub(storage_cost);
 
-        let threshold = NearToken::from_near(1).saturating_mul(6);
-        if extra_balance >= threshold {
-            let extra = extra_balance.saturating_sub(NearToken::from_near(1).saturating_mul(5));
+        if extra_balance >= 6 * ONE_NEAR {
+            // only if there's more than 6 NEAR to transfer, and leave 5 extra NEAR
+            //to backup the storage an extra 500kb
+            let extra =
+                extra_balance.saturating_sub(ONE_NEAR.checked_mul(5).expect("msg: overflow"));
             Promise::new(self.owner_id.clone()).transfer(extra);
-            return U128::from(extra.as_yoctonear());
+            return extra.into();
         }
 
         return 0.into();
