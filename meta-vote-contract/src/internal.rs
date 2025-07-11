@@ -15,11 +15,7 @@ impl MetaVoteContract {
     }
 
     pub(crate) fn assert_min_deposit_amount(&self, amount: u128) {
-        assert!(
-            amount >= self.min_deposit_amount,
-            "Minimum deposit amount is {} mpDAO.",
-            self.min_deposit_amount
-        );
+        require!(amount >= self.min_deposit_amount, "BellowMinimumDepositAmount");
     }
 
     /// Inner method to get or create a Voter.
@@ -109,11 +105,7 @@ impl MetaVoteContract {
         token: &str,
     ) {
         let existing_claimable_amount = claimable_map.get(&account).unwrap_or_default();
-        assert!(
-            existing_claimable_amount >= amount,
-            "you don't have enough claimable {}",
-            token
-        );
+        require!(existing_claimable_amount >= amount, "NotEnoughClaimableTokens");
         let after_remove = existing_claimable_amount - amount;
         if after_remove == 0 {
             // 0 means remove
@@ -126,7 +118,7 @@ impl MetaVoteContract {
     }
 
     pub(crate) fn add_claimable_mpdao(&mut self, account: &String, amount: u128) {
-        assert!(amount > 0);
+        require!(amount > 0, "InvalidZeroAmount");
         Self::add_claimable(
             &mut self.claimable_mpdao,
             &mut self.total_unclaimed_mpdao,
@@ -136,7 +128,7 @@ impl MetaVoteContract {
     }
 
     pub(crate) fn add_claimable_stnear(&mut self, account: &String, amount: u128) {
-        assert!(amount > 0);
+        require!(amount > 0, "InvalidZeroAmount");
         Self::add_claimable(
             &mut self.claimable_stnear,
             &mut self.total_unclaimed_stnear,

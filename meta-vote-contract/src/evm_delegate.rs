@@ -203,12 +203,7 @@ impl MetaVoteContract {
     pub fn get_delegates(&self, from_index: u32, limit: u32) -> Vec<(String, Vec<EvmAddress>)> {
         let keys = self.evm_delegates.keys_as_vector();
         let keys_len = keys.len() as u32;
-        assert!(
-            from_index < keys_len,
-            "from_index >= keys_len, {} >= {}",
-            from_index,
-            keys_len
-        );
+        require!(from_index < keys_len, "from_index greater than evm_delegates");
         let after_last = std::cmp::min(from_index + limit, keys_len);
 
         let mut results = vec![];

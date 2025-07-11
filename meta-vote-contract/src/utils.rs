@@ -31,10 +31,7 @@ pub fn pseudo_near_address(external_address: &String) -> String {
 }
 
 pub fn assert_at_least_1_mpdao(mpdao_amount: MpDAOAmount) {
-    assert!(
-        mpdao_amount >= ONE_MPDAO,
-        "amount should be at least 1 mpDAO"
-    ); // at least 1 mpDAO
+    require!(mpdao_amount >= ONE_MPDAO, "amount should be at least 1 mpDAO");
 }
 
 /// Voting power is proportional to unbond_period
@@ -44,6 +41,6 @@ pub fn assert_at_least_1_mpdao(mpdao_amount: MpDAOAmount) {
 pub fn calculate_voting_power(mpdao_amount: MpDAOAmount, unbond_days: Days) -> u128 {
     // voting power is u128 with 24 decimals (NEAR standard) and mpdao_amount has 6 decimals
     let base_vp = mpdao_amount.checked_mul(E18).expect("vp overflow"); // convert to 24 decimals voting power
-    assert!(unbond_days < 3600); // put a limit to unbond_days
+    require!(unbond_days < 3600); // put a limit to unbond_days
     proportional(base_vp, unbond_days.into(), 60) // apply multiplier
 }

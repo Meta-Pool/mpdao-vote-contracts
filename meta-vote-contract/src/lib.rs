@@ -467,7 +467,7 @@ impl MetaVoteContract {
                 "A locking position cannot have less than {} mpDAO.",
                 self.min_deposit_amount
             );
-            assert!(new_amount > 0, "Use relock_position() function instead.");
+            require!(new_amount > 0, "Use relock_position() function instead.");
 
             locking_position.amount = new_amount;
             locking_position.voting_power =
@@ -784,7 +784,7 @@ impl MetaVoteContract {
     pub fn update_mpdao_per_near_e24(&mut self, mpdao_per_near_e24: U128) {
         self.assert_operator();
         // sanity check
-        assert!(
+        require!(
             mpdao_per_near_e24.0 >= ONE_NEAR.as_yoctonear(),
             "mpdao_per_near_e24 should be greater than ONE per NEAR"
         );
