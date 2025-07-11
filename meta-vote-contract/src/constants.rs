@@ -20,9 +20,8 @@ pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas::from_tgas(11);
 //ARF
 //In near-sdk 5.x, the derive macro #[derive(BorshStorageKey)] needs to know which crate borsh and near_sdk use, because of the internal decoupling they did in the new version.
 
-#[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)]
-#[borsh(crate = "near_sdk::borsh")]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, Clone, PartialEq, Eq))]
+#[derive(BorshStorageKey)]
+#[near(serializers = [borsh, json])]
 pub enum StorageKey {
     LockingPosition { hash_id: CryptoHash },
     VotePosition { hash_id: CryptoHash },
