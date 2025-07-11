@@ -4,7 +4,6 @@ use crate::*;
 use near_contract_standards::fungible_token::Balance;
 use near_sdk::{assert_one_yocto, json_types::U128, near_bindgen, Promise, PromiseResult};
 
-#[near_bindgen]
 impl MetaVoteContract {
     // ************
     // * Withdraw *
