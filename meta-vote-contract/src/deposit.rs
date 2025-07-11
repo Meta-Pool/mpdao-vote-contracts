@@ -1,11 +1,10 @@
 use crate::*;
-use near_contract_standards::fungible_token::Balance;
 use near_sdk::json_types::U128;
 use near_sdk::{env, log, serde_json, PromiseOrValue};
 
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 
-const E20: Balance = 100_000_000_000_000_000_000;
+const E20: u128 = 100_000_000_000_000_000_000;
 
 #[near]
 impl FungibleTokenReceiver for MetaVoteContract {

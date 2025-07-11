@@ -1,5 +1,4 @@
 use crate::*;
-use near_contract_standards::fungible_token::Balance;
 
 impl MetaVoteContract {
     pub(crate) fn assert_only_owner(&self) {
@@ -15,7 +14,7 @@ impl MetaVoteContract {
         );
     }
 
-    pub(crate) fn assert_min_deposit_amount(&self, amount: Balance) {
+    pub(crate) fn assert_min_deposit_amount(&self, amount: u128) {
         assert!(
             amount >= self.min_deposit_amount,
             "Minimum deposit amount is {} mpDAO.",
