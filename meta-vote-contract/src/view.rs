@@ -6,6 +6,7 @@ use near_sdk::{
     json_types::{U128, U64},
     near_bindgen,
 };
+use schemars::JsonSchema;
 
 type U128String = U128;
 
@@ -13,7 +14,7 @@ type U128String = U128;
 /*   View functions   */
 /**********************/
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(crate = "near_sdk::serde")]
 pub struct ContractInfoJson {
     pub owner_id: String,
