@@ -1,14 +1,15 @@
 use near_sdk::{
-    json_types::{U128, U64},
     assert_one_yocto,
     collections::unordered_map::UnorderedMap,
-    env, log, require,
-    near,
+    env,
+    json_types::{U128, U64},
+    log, near, require,
+    store::LookupMap,
     store::Vector,
-    store::LookupMap, AccountId, NearToken, PanicOnDefault, Promise, PromiseResult,
+    AccountId, NearToken, PanicOnDefault, Promise, PromiseResult,
 };
 
-use crate::{constants::*, locking_position::*, utils::*, types::*, voter::*};
+use crate::{constants::*, locking_position::*, types::*, utils::*, voter::*};
 
 mod constants;
 mod deposit;
@@ -246,11 +247,7 @@ impl MetaVoteContract {
             voting_power
         );
 
-        log!(
-            "UNLOCK: {} unlocked position {}.",
-            &voter_id.to_string(),
-            index
-        );
+        log!("UNLOCK: {} unlocked position {}.", &voter_id.to_string(), index);
         locking_position.unlocking_started_at = Some(get_current_epoch_millis());
         voter.locking_positions.replace(index, locking_position);
         voter.available_voting_power -= voting_power;
@@ -337,8 +334,7 @@ impl MetaVoteContract {
         );
 
         let old_voting_power = locking_position.voting_power;
-        let new_voting_power =
-            utils::calculate_voting_power(locking_position.amount, new_locking_period);
+        let new_voting_power = utils::calculate_voting_power(locking_position.amount, new_locking_period);
 
         // update to new total-voting-power (add delta)
         self.total_voting_power += new_voting_power - old_voting_power;
@@ -359,12 +355,7 @@ impl MetaVoteContract {
     // * Re-Lock *
     // ***********
 
-    pub fn relock_position(
-        &mut self,
-        index: PositionIndex,
-        locking_period: Days,
-        amount_from_balance: U128,
-    ) {
+    pub fn relock_position(&mut self, index: PositionIndex, locking_period: Days, amount_from_balance: U128) {
         let voter_id = env::predecessor_account_id().as_str().to_string();
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let locking_position = voter.get_position(index);
@@ -384,8 +375,7 @@ impl MetaVoteContract {
         );
 
         let now = get_current_epoch_millis();
-        let unlocking_date = locking_position.unlocking_started_at.unwrap()
-            + locking_position.locking_period_millis();
+        let unlocking_date = locking_position.unlocking_started_at.unwrap() + locking_position.locking_period_millis();
 
         if now < unlocking_date {
             // Position is still in the **unlocking** period, (unlocking_date is in the future)
@@ -397,11 +387,7 @@ impl MetaVoteContract {
             );
         }
 
-        log!(
-            "RELOCK: {} relocked position {}.",
-            &voter_id.to_string(),
-            index
-        );
+        log!("RELOCK: {} relocked position {}.", &voter_id.to_string(), index);
         let amount = locking_position.amount + amount_from_balance;
         voter.remove_position(index);
         voter.balance -= amount_from_balance;
@@ -447,8 +433,7 @@ impl MetaVoteContract {
         );
 
         let now = get_current_epoch_millis();
-        let unlocking_date = locking_position.unlocking_started_at.unwrap()
-            + locking_position.locking_period_millis();
+        let unlocking_date = locking_position.unlocking_started_at.unwrap() + locking_position.locking_period_millis();
 
         if now < unlocking_date {
             // Position is **unlocking**.
@@ -468,8 +453,7 @@ impl MetaVoteContract {
             require!(new_amount > 0, "Use relock_position() function instead.");
 
             locking_position.amount = new_amount;
-            locking_position.voting_power =
-                utils::calculate_voting_power(new_amount, locking_position.locking_period);
+            locking_position.voting_power = utils::calculate_voting_power(new_amount, locking_position.locking_period);
             voter.locking_positions.replace(index, locking_position);
         } else {
             voter.balance += locking_position.amount - amount_from_position;
@@ -525,12 +509,7 @@ impl MetaVoteContract {
     // * Voting *
     // **********
 
-    pub fn vote(
-        &mut self,
-        voting_power: U128,
-        contract_address: ContractAddress,
-        votable_object_id: VotableObjId,
-    ) {
+    pub fn vote(&mut self, voting_power: U128, contract_address: ContractAddress, votable_object_id: VotableObjId) {
         self.internal_vote(
             &env::predecessor_account_id().as_str().to_string(),
             voting_power,
@@ -569,6 +548,22 @@ impl MetaVoteContract {
         );
     }
 
+    /// ARF
+    /// Updated voting position creation logic:
+    ///
+    /// Previously, only the `voting_power` (as `u128`) was stored and updated for each votable object.
+    /// Now, full `VotePosition` structs are stored, which also include `created_at` and `was_revalidated`.
+    ///
+    /// Key changes:
+    /// - The default value when no position exists is now a full `VotePosition` with:
+    ///     - `voting_power = 0`
+    ///     - `created_at = current block timestamp`
+    ///     - `was_revalidated = false`
+    /// - Instead of incrementing a raw number, we now modify the `voting_power` field of the `VotePosition`.
+    /// - This enables better tracking and auditing of votes over time, while maintaining backward-compatible logic.
+    ///
+    /// Other logic (e.g. subtracting available voting power and increasing global vote count)
+    /// remains unchanged.
     fn internal_create_voting_position(
         &mut self,
         voter_id: &String,
@@ -589,21 +584,45 @@ impl MetaVoteContract {
             self.max_voting_positions
         );
 
-        let mut votes_for_address =
-            voter.get_vote_position_for_address(&voter_id, &contract_address);
-        let mut votes = votes_for_address.get(&votable_object_id).unwrap_or(0_u128);
+        let mut votes_for_address = voter.get_vote_position_for_address(&voter_id, &contract_address);
 
+        let mut votes = votes_for_address.get(&votable_object_id).unwrap_or(VotePosition {
+            voting_power: 0,
+            created_at: env::block_timestamp() / 1_000_000,
+            was_revalidated: false,
+        });
         voter.available_voting_power -= voting_power;
-        votes += voting_power;
+        votes.voting_power += voting_power;
         votes_for_address.insert(&votable_object_id, &votes);
-        voter
-            .vote_positions
-            .insert(&contract_address, &votes_for_address);
+        voter.vote_positions.insert(&contract_address, &votes_for_address);
 
         // Update Meta Vote state.
         self.internal_increase_total_votes(voting_power, &contract_address, &votable_object_id);
     }
 
+    /// ARF
+    /// Updated `rebalance` function to support full `VotePosition` struct:
+    ///
+    /// ### What changed:
+    /// - Previously, only the raw `u128` voting power was stored per object,
+    ///   so the function worked by manipulating `u128` values directly.
+    /// - Now, each vote is stored as a `VotePosition`, which includes:
+    ///     - `voting_power`: the amount of vote assigned
+    ///     - `created_at`: timestamp of creation
+    ///     - `was_revalidated`: a flag for future manual review/use
+    ///
+    /// ### Why the update:
+    /// - To enable richer vote metadata and future extensibility (e.g. UI display, analytics, vote revalidation).
+    /// - To centralize vote-related data into a single struct rather than scattering fields separately.
+    ///
+    /// ### Key adjustments:
+    /// - The `.get(...)` call now returns a `VotePosition` instead of `u128`.
+    /// - All updates are made to the `voting_power` field inside the `VotePosition`.
+    /// - Logging and logic remain the same, but adapted to access the field directly (`votes.voting_power`).
+    ///
+    /// ### Invariant:
+    /// - The semantics of rebalancing are unchanged:  
+    ///   increasing or decreasing the `voting_power` for a specific votable object while updating totals.
     pub fn rebalance(
         &mut self,
         voting_power: U128,
@@ -614,71 +633,86 @@ impl MetaVoteContract {
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let voting_power = u128::from(voting_power);
 
-        let mut votes_for_address =
-            voter.get_vote_position_for_address(&voter_id, &contract_address);
+        let mut votes_for_address = voter.get_vote_position_for_address(&voter_id, &contract_address);
         let mut votes = votes_for_address
             .get(&votable_object_id)
             .expect("Rebalance not allowed for nonexisting Votable Object.");
 
         require!(
-            votes != voting_power,
+            votes.voting_power != voting_power,
             "Cannot rebalance to same Voting Power."
         );
+
         if voting_power == 0 {
             return self.unvote(contract_address, votable_object_id);
         }
 
-        if votes < voting_power {
-            // Increase votes.
-            let additional_votes = voting_power - votes;
+        if votes.voting_power < voting_power {
+            // Increase votes
+            let additional_votes = voting_power - votes.voting_power;
             assert!(
                 voter.available_voting_power >= additional_votes,
                 "Not enough free voting power to unlock! You have {}, required {}.",
                 voter.available_voting_power,
                 additional_votes
             );
+
             voter.available_voting_power -= additional_votes;
-            votes += additional_votes;
+            votes.voting_power += additional_votes;
 
             log!(
                 "VOTE: {} increased to {} votes for object {} at address {}.",
                 &voter_id,
-                voting_power.to_string(),
+                votes.voting_power.to_string(),
                 &votable_object_id,
                 contract_address.as_str()
             );
 
-            self.internal_increase_total_votes(
-                additional_votes,
-                &contract_address,
-                &votable_object_id,
-            );
+            self.internal_increase_total_votes(additional_votes, &contract_address, &votable_object_id);
         } else {
-            // Decrease votes.
-            let remove_votes = votes - voting_power;
+            // Decrease votes
+            let remove_votes = votes.voting_power - voting_power;
             voter.available_voting_power += remove_votes;
-            votes -= remove_votes;
+            votes.voting_power -= remove_votes;
 
             log!(
                 "VOTE: {} decreased to {} votes for object {} at address {}.",
                 &voter_id,
-                voting_power.to_string(),
+                votes.voting_power.to_string(),
                 &votable_object_id,
                 contract_address.as_str()
             );
 
-            self.state_internal_decrease_total_votes_for_address(
-                remove_votes,
-                &contract_address,
-                &votable_object_id,
-            );
+            self.state_internal_decrease_total_votes_for_address(remove_votes, &contract_address, &votable_object_id);
         }
         votes_for_address.insert(&votable_object_id, &votes);
-        voter
-            .vote_positions
-            .insert(&contract_address, &votes_for_address);
+        voter.vote_positions.insert(&contract_address, &votes_for_address);
         self.voters.insert(&voter_id, &voter);
     }
+
+    /// Updated `internal_remove_voting_position` to work with full `VotePosition` struct.
+    ///
+    /// ### What changed:
+    /// - The previous implementation assumed that vote values were stored as raw `u128` voting power.
+    /// - The new implementation uses the full `VotePosition` struct, which contains:
+    ///     - `voting_power`: the amount of voting tokens allocated
+    ///     - `created_at`: timestamp when the position was created
+    ///     - `was_revalidated`: flag used for future tracking or manual review
+    ///
+    /// ### Key adjustments:
+    /// - Now we extract the `voting_power` field from the `VotePosition` instead of using the raw value directly.
+    /// - All logic that modifies `available_voting_power` or the total vote count uses this field accordingly.
+    ///
+    /// ### Why:
+    /// - This change aligns with the broader refactor to support richer vote metadata.
+    /// - It allows the protocol to retain historical or stateful data on individual vote actions,
+    ///   which will be useful for governance analytics, auditing, or advanced features.
+    ///
+    /// ### Function behavior remains:
+    /// - Frees up the user's `voting_power` upon unvote.
+    /// - Removes the specific vote entry and cleans up contract-level entries if empty.
+    /// - Updates the global total vote tracker.
+    /// - Emits a log indicating the unvote action.
 
     fn internal_remove_voting_position(
         &mut self,
@@ -688,25 +722,22 @@ impl MetaVoteContract {
         votable_object_id: &VotableObjId,
     ) {
         // update this voter struct
-        let mut user_votes_for_app =
-            voter.get_vote_position_for_address(&voter_id, &contract_address);
+        let mut user_votes_for_app = voter.get_vote_position_for_address(&voter_id, &contract_address);
         let user_vote_for_object = user_votes_for_app
             .get(&votable_object_id)
             .expect("Cannot unvote a Votable Object without votes.");
 
-        voter.available_voting_power += user_vote_for_object; // available voting power
+        voter.available_voting_power += user_vote_for_object.voting_power;
         user_votes_for_app.remove(&votable_object_id);
 
         if user_votes_for_app.is_empty() {
             voter.vote_positions.remove(&contract_address);
         } else {
-            voter
-                .vote_positions
-                .insert(&contract_address, &user_votes_for_app);
+            voter.vote_positions.insert(&contract_address, &user_votes_for_app);
         }
         // Update Meta Vote global state unordered maps
         self.state_internal_decrease_total_votes_for_address(
-            user_vote_for_object,
+            user_vote_for_object.voting_power,
             &contract_address,
             &votable_object_id,
         );
@@ -737,23 +768,16 @@ impl MetaVoteContract {
             {
                 let votable_object_id_filter = format!(" #{} ", self.lock_votes_in_numeric_id);
                 if votable_object_id.contains(&votable_object_id_filter) {
-                    env::panic_str(
-                        &format!(
-                            "you can not remove votes here until timestamp_ms {}",
-                            self.lock_votes_in_end_timestamp_ms
-                        )
-                    )
+                    env::panic_str(&format!(
+                        "you can not remove votes here until timestamp_ms {}",
+                        self.lock_votes_in_end_timestamp_ms
+                    ))
                 }
             }
         }
 
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
-        self.internal_remove_voting_position(
-            &voter_id,
-            &mut voter,
-            &contract_address,
-            &votable_object_id,
-        );
+        self.internal_remove_voting_position(&voter_id, &mut voter, &contract_address, &votable_object_id);
         // save voter
         self.voters.insert(&voter_id, &voter);
     }
@@ -798,12 +822,7 @@ impl MetaVoteContract {
     }
 
     #[payable]
-    pub fn buy_lock_and_vote(
-        &mut self,
-        days: u16,
-        contract_address: ContractAddress,
-        votable_object_id: VotableObjId,
-    ) {
+    pub fn buy_lock_and_vote(&mut self, days: u16, contract_address: ContractAddress, votable_object_id: VotableObjId) {
         // sanity check
         require!(
             self.mpdao_per_near_e24 >= ONE_NEAR.as_yoctonear(),
@@ -838,12 +857,7 @@ impl MetaVoteContract {
             amount_near,
             mpdao_amount
         );
-        self.internal_vote(
-            &voter_id,
-            voting_power.into(),
-            contract_address,
-            votable_object_id,
-        )
+        self.internal_vote(&voter_id, voting_power.into(), contract_address, votable_object_id)
     }
 
     // If extra NEAR balance (from buy_lock_and_vote)
@@ -858,8 +872,7 @@ impl MetaVoteContract {
         if extra_balance >= ONE_NEAR.checked_mul(6).expect("overflow") {
             // only if there's more than 6 NEAR to transfer, and leave 5 extra NEAR
             //to backup the storage an extra 500kb
-            let extra =
-                extra_balance.saturating_sub(ONE_NEAR.checked_mul(5).expect("overflow"));
+            let extra = extra_balance.saturating_sub(ONE_NEAR.checked_mul(5).expect("overflow"));
             Promise::new(self.owner_id.clone()).transfer(extra);
             return extra.as_yoctonear().into();
         }
@@ -931,11 +944,7 @@ impl MetaVoteContract {
 
     // bot-managed mirroring of locking positions in ethereum and l2s
     // tuple Vec is (unbond_days, mpdao_amount)
-    pub fn operator_mirror_lps(
-        &mut self,
-        external_address: EvmAddress,
-        locking_positions: Vec<(u16, U128)>,
-    ) {
+    pub fn operator_mirror_lps(&mut self, external_address: EvmAddress, locking_positions: Vec<(u16, U128)>) {
         self.assert_operator();
         // external mirrored addresses are in the form of [address].evmp.near
         // example for an eth based address: f1552d1d7CD279A7B766F431c5FaC49A2fb6e361.evmp.near
@@ -962,16 +971,10 @@ impl MetaVoteContract {
             let first_voted_app_key: String = voter.vote_positions.keys_as_vector().get(0).unwrap();
             let first_voted_app_data = voter.vote_positions.get(&first_voted_app_key).unwrap();
             let first_voted_object_key = first_voted_app_data.keys_as_vector().get(0).unwrap();
-            let used_voting_power_to_remove =
-                first_voted_app_data.get(&first_voted_object_key).unwrap();
+            let used_voting_power_to_remove = first_voted_app_data.get(&first_voted_object_key).unwrap();
             // this fn manages all other accumulators that need to be updated when removing votes
-            self.internal_remove_voting_position(
-                &voter_id,
-                &mut voter,
-                &first_voted_app_key,
-                &first_voted_object_key,
-            );
-            used_voting_power -= used_voting_power_to_remove;
+            self.internal_remove_voting_position(&voter_id, &mut voter, &first_voted_app_key, &first_voted_object_key);
+            used_voting_power -= used_voting_power_to_remove.voting_power;
         }
         // HANDLE LOCKING POSITIONS
         // first clear all
