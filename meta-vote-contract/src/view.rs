@@ -53,9 +53,7 @@ impl MetaVoteContract {
             stnear_token_contract_address: self.stnear_token_contract_address.as_str().into(),
             registration_cost: self.registration_cost.into(),
             prev_governance_contract: self.prev_governance_contract.as_str().into(),
-            accumulated_mpdao_distributed_for_claims: self
-                .accumulated_mpdao_distributed_for_claims
-                .into(),
+            accumulated_mpdao_distributed_for_claims: self.accumulated_mpdao_distributed_for_claims.into(),
             total_unclaimed_mpdao: self.total_unclaimed_mpdao.into(),
             accum_distributed_stnear_for_claims: self.accum_distributed_stnear_for_claims.into(),
             total_unclaimed_stnear: self.total_unclaimed_stnear.into(),
@@ -112,10 +110,7 @@ impl MetaVoteContract {
     }
 
     pub fn get_claimable_mpdao(&self, voter_id: &VoterId) -> U128 {
-        self.claimable_mpdao
-            .get(&voter_id)
-            .unwrap_or_default()
-            .into()
+        self.claimable_mpdao.get(&voter_id).unwrap_or_default().into()
     }
     // kept to not break public interface
     pub fn get_claimable_meta(&self, voter_id: &VoterId) -> U128 {
@@ -123,10 +118,7 @@ impl MetaVoteContract {
     }
 
     pub fn get_claimable_stnear(&self, voter_id: &VoterId) -> U128 {
-        self.claimable_stnear
-            .get(&voter_id)
-            .unwrap_or_default()
-            .into()
+        self.claimable_stnear.get(&voter_id).unwrap_or_default().into()
     }
 
     // get all claims
@@ -192,20 +184,13 @@ impl MetaVoteContract {
         let mut result = Vec::new();
         let voter = self.internal_get_voter(&voter_id);
         for index in 0..voter.locking_positions.len() {
-            let locking_position = voter
-                .locking_positions
-                .get(index)
-                .expect("Locking position not found!");
+            let locking_position = voter.locking_positions.get(index).expect("Locking position not found!");
             result.push(locking_position.to_json(Some(index)));
         }
         result
     }
 
-    pub fn get_locking_position(
-        &self,
-        index: PositionIndex,
-        voter_id: VoterId,
-    ) -> Option<LockingPositionJSON> {
+    pub fn get_locking_position(&self, index: PositionIndex, voter_id: VoterId) -> Option<LockingPositionJSON> {
         let voter = self.internal_get_voter(&voter_id);
         match voter.locking_positions.get(index) {
             Some(locking_position) => Some(locking_position.to_json(Some(index))),
@@ -214,11 +199,7 @@ impl MetaVoteContract {
     }
 
     // votes by app and votable_object
-    pub fn get_total_votes(
-        &self,
-        contract_address: ContractAddress,
-        votable_object_id: VotableObjId,
-    ) -> U128 {
+    pub fn get_total_votes(&self, contract_address: ContractAddress, votable_object_id: VotableObjId) -> U128 {
         let votes = match self.votes.get(&contract_address) {
             Some(object) => object.get(&votable_object_id).unwrap_or(0_u128),
             None => 0_u128,
@@ -242,10 +223,8 @@ impl MetaVoteContract {
     }
 
     // votes by app (deprecated, use get_votes_by_app)
-    pub fn get_votes_by_contract(
-        &self,
-        contract_address: ContractAddress,
-    ) -> Vec<VotableObjectJSON> {
+    //The get_votes_by_contract function has been updated to reflect the new structure of VotableObjectJSON. Previously, voting data only included basic information such as the contract address and voting power. Now, the function constructs VotableObjectJSON objects that include additional metadata fields: created_at and was_revalidated.
+    pub fn get_votes_by_contract(&self, contract_address: ContractAddress) -> Vec<VotableObjectJSON> {
         let objects = self
             .votes
             .get(&contract_address)
@@ -257,41 +236,58 @@ impl MetaVoteContract {
                 votable_contract: contract_address.to_string(),
                 id,
                 current_votes: applied_voting_power.into(),
+                created_at: 0,
+                was_revalidated: false,
             })
         }
         results.sort_by_key(|v| v.current_votes.0);
         results
     }
     // given a voter, total votes per app + object_id
+    //The get_votes_by_voter function has been updated to accommodate the new VotePosition structure. Previously, the function retrieved voting data as simple numeric values (u128) representing the applied voting power. Now, it extracts detailed information from the VotePosition structure, which includes additional metadata fields.
+    //The function now accesses the created_at and was_revalidated fields from the VotePosition structure and includes them in the VotableObjectJSON output.
+    //This provides more context about each voting position, such as when it was created and whether it has been revalidated.
     pub fn get_votes_by_voter(&self, voter_id: VoterId) -> Vec<VotableObjectJSON> {
         let mut results: Vec<VotableObjectJSON> = Vec::new();
         let voter = self.internal_get_voter(&voter_id);
         for contract_address in voter.vote_positions.keys_as_vector().iter() {
             let votes_for_address = voter.vote_positions.get(&contract_address).unwrap();
-            for (id, applied_voting_power) in votes_for_address.iter() {
+            for (id, vote_position) in votes_for_address.iter() {
                 results.push(VotableObjectJSON {
                     votable_contract: contract_address.to_string(),
                     id,
-                    current_votes: applied_voting_power.into(),
-                })
+                    current_votes: vote_position.voting_power.into(),
+                    created_at: vote_position.created_at,
+                    was_revalidated: vote_position.was_revalidated,
+                });
             }
         }
         results.sort_by_key(|v| v.current_votes.0);
         results
     }
 
+    /// Returns the voting power (`voting_power`) a voter has allocated to a specific votable object
+    /// within a contract. If no vote exists, returns 0.
     pub fn get_votes_for_object(
         &self,
         voter_id: VoterId,
         contract_address: ContractAddress,
         votable_object_id: VotableObjId,
     ) -> U128 {
+        // Retrieve the voter struct (if registered) from storage
         let voter = self.internal_get_voter(&voter_id);
-        let votes = match voter.vote_positions.get(&contract_address) {
-            Some(votes_for_address) => votes_for_address.get(&votable_object_id).unwrap_or(0_u128),
-            None => 0_u128,
-        };
-        votes.into()
+
+        // Navigate to the inner map: contract_address -> votable_object_id -> VotePosition
+        match voter.vote_positions.get(&contract_address) {
+            Some(votes_for_address) => {
+                // Try to get the VotePosition for the specific object
+                let vp = votes_for_address.get(&votable_object_id);
+                // If found, return voting_power as U128; else return 0
+                vp.map(|v| v.voting_power.into()).unwrap_or(0.into())
+            }
+            // No votes found for the contract → return 0
+            None => 0.into(),
+        }
     }
 
     // query current meta ready for distribution

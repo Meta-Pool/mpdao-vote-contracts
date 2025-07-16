@@ -8,13 +8,40 @@ pub struct VoterJSON {
     pub voting_power: U128,                          // available voting power
     pub vote_positions: Vec<VotePositionJSON>,       // sum here to get used voting power
 }
+
+//voting_power
+//This field defines the amount of voting power assigned to this position.
+//It is a numeric value used to calculate the impact of votes within the system.
+//created_at
+//This field stores the timestamp in milliseconds since the Unix epoch when this position was created.
+//It is useful for auditing, sorting positions by age, or filtering positions based on their creation date.
+//was_revalidated
+//This field is a boolean indicator that signals whether the position has been revalidated.
+//Revalidation may be necessary to ensure the position remains valid according to the current system rules.
+#[derive(Debug)]
+#[near(serializers = [borsh])]
+pub struct VotePosition {
+    pub voting_power: u128,
+    pub created_at: EpochMillis,
+    pub was_revalidated: bool,
+}
+
+//The change in the Voter structure modifies the vote_positions field. Previously, it used UnorderedMap<ContractAddress, UnorderedMap<VotableObjId, u128>>, where the value for each VotableObjId was a simple numeric voting power (u128). Now, it uses UnorderedMap<ContractAddress, UnorderedMap<VotableObjId, VotePosition>>, where the value is a VotePosition structure.
+//Previous Structure
+//Voting power was stored as a simple numeric value (u128).
+//This limited the ability to store additional information about each voting position.
+//New Structure (VotePosition)
+//Each voting position is now represented by a VotePosition structure, which includes:
+//voting_power: The assigned voting power.
+//created_at: The creation timestamp in milliseconds since the Unix epoch.
+//was_revalidated: A boolean indicating whether the position was revalidated.
 #[derive(Debug)]
 #[near(serializers = [borsh])]
 pub struct Voter {
     pub balance: MpDAOAmount,
     pub locking_positions: Vector<LockingPosition>,
     pub available_voting_power: u128, // available voting power, equals to sum(lp.voting_power)-sum(vp.voting_power)
-    pub vote_positions: UnorderedMap<ContractAddress, UnorderedMap<VotableObjId, u128>>,
+    pub vote_positions: UnorderedMap<ContractAddress, UnorderedMap<VotableObjId, VotePosition>>,
 }
 
 impl Voter {
@@ -74,10 +101,12 @@ impl Voter {
             .sum()
     }
 
+    //In this version, the vote_positions field now stores values of type VotePosition, which are structures containing detailed information about each voting position.
+    //The function accesses the voting_power field of each VotePosition and sums these values to calculate the total voting power used.
     pub(crate) fn sum_used_votes(&self) -> u128 {
         let mut result = 0_u128;
         for map in self.vote_positions.values() {
-            result += map.values().sum::<u128>();
+            result += map.values().map(|v| v.voting_power).sum::<u128>();
         }
         result
     }
@@ -101,11 +130,12 @@ impl Voter {
         self.locking_positions.swap_remove(index);
     }
 
+    //The get_vote_position_for_address function has been updated to handle the new VotePosition structure. Previously, vote_positions stored simple numeric values (u128) for voting power. Now, it stores detailed VotePosition structures.
     pub(crate) fn get_vote_position_for_address(
         &self,
         voter_id: &VoterId,
         contract_address: &ContractAddress,
-    ) -> UnorderedMap<VotableObjId, u128> {
+    ) -> UnorderedMap<VotableObjId, VotePosition> {
         let id = format!("{}-{}", voter_id.to_string(), contract_address.as_str());
 
         self.vote_positions
@@ -126,6 +156,7 @@ impl Voter {
         result
     }
 
+    //The to_json function has been updated to reflect the new structure of VotePosition. Previously, voting positions were stored as simple numeric values (u128). Now, they are represented by the VotePosition structure, which includes additional metadata such as voting_power, created_at, and was_revalidated.
     pub(crate) fn to_json(&self, voter_id: &VoterId) -> VoterJSON {
         let mut locking_positions = Vec::<LockingPositionJSON>::new();
         for index in 0..self.locking_positions.len() {
@@ -141,7 +172,9 @@ impl Voter {
                 vote_positions.push(VotePositionJSON {
                     votable_address: address.as_str().to_string(),
                     votable_object_id: obj,
-                    voting_power: value.into(),
+                    voting_power: value.voting_power.into(),
+                    created_at: value.created_at,
+                    was_revalidated: value.was_revalidated,
                 });
             }
         }
