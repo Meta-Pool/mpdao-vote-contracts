@@ -552,13 +552,12 @@ impl MetaVoteContract {
     /// Updated voting position creation logic:
     ///
     /// Previously, only the `voting_power` (as `u128`) was stored and updated for each votable object.
-    /// Now, full `VotePosition` structs are stored, which also include `created_at` and `was_revalidated`.
+    /// Now, full `VotePosition` structs are stored, which also include `created_at`
     ///
     /// Key changes:
     /// - The default value when no position exists is now a full `VotePosition` with:
     ///     - `voting_power = 0`
     ///     - `created_at = current block timestamp`
-    ///     - `was_revalidated = false`
     /// - Instead of incrementing a raw number, we now modify the `voting_power` field of the `VotePosition`.
     /// - This enables better tracking and auditing of votes over time, while maintaining backward-compatible logic.
     ///
@@ -608,7 +607,6 @@ impl MetaVoteContract {
     /// - Now, each vote is stored as a `VotePosition`, which includes:
     ///     - `voting_power`: the amount of vote assigned
     ///     - `created_at`: timestamp of creation
-    ///     - `was_revalidated`: a flag for future manual review/use
     ///
     /// ### Why the update:
     /// - To enable richer vote metadata and future extensibility (e.g. UI display, analytics, vote revalidation).
@@ -696,7 +694,6 @@ impl MetaVoteContract {
     /// - The new implementation uses the full `VotePosition` struct, which contains:
     ///     - `voting_power`: the amount of voting tokens allocated
     ///     - `created_at`: timestamp when the position was created
-    ///     - `was_revalidated`: flag used for future tracking or manual review
     ///
     /// ### Key adjustments:
     /// - Now we extract the `voting_power` field from the `VotePosition` instead of using the raw value directly.

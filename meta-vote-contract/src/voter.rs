@@ -15,9 +15,6 @@ pub struct VoterJSON {
 //created_at
 //This field stores the timestamp in milliseconds since the Unix epoch when this position was created.
 //It is useful for auditing, sorting positions by age, or filtering positions based on their creation date.
-//was_revalidated
-//This field is a boolean indicator that signals whether the position has been revalidated.
-//Revalidation may be necessary to ensure the position remains valid according to the current system rules.
 #[derive(Debug)]
 #[near(serializers = [borsh])]
 pub struct VotePosition {
@@ -33,7 +30,6 @@ pub struct VotePosition {
 //Each voting position is now represented by a VotePosition structure, which includes:
 //voting_power: The assigned voting power.
 //created_at: The creation timestamp in milliseconds since the Unix epoch.
-//was_revalidated: A boolean indicating whether the position was revalidated.
 #[derive(Debug)]
 #[near(serializers = [borsh])]
 pub struct Voter {
@@ -155,7 +151,7 @@ impl Voter {
         result
     }
 
-    //The to_json function has been updated to reflect the new structure of VotePosition. Previously, voting positions were stored as simple numeric values (u128). Now, they are represented by the VotePosition structure, which includes additional metadata such as voting_power, created_at, and was_revalidated.
+    //The to_json function has been updated to reflect the new structure of VotePosition. Previously, voting positions were stored as simple numeric values (u128). Now, they are represented by the VotePosition structure, which includes additional metadata such as voting_power and created_at.
     pub(crate) fn to_json(&self, voter_id: &VoterId) -> VoterJSON {
         let mut locking_positions = Vec::<LockingPositionJSON>::new();
         for index in 0..self.locking_positions.len() {

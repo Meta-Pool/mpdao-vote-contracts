@@ -223,7 +223,7 @@ impl MetaVoteContract {
     }
 
     // votes by app (deprecated, use get_votes_by_app)
-    //The get_votes_by_contract function has been updated to reflect the new structure of VotableObjectJSON. Previously, voting data only included basic information such as the contract address and voting power. Now, the function constructs VotableObjectJSON objects that include additional metadata fields: created_at and was_revalidated.
+    //The get_votes_by_contract function has been updated to reflect the new structure of VotableObjectJSON. Previously, voting data only included basic information such as the contract address and voting power. Now, the function constructs VotableObjectJSON objects that include additional metadata fields: created_at
     pub fn get_votes_by_contract(&self, contract_address: ContractAddress) -> Vec<VotableObjectJSON> {
         let objects = self
             .votes
@@ -243,9 +243,9 @@ impl MetaVoteContract {
         results
     }
     // given a voter, total votes per app + object_id
-    //The get_votes_by_voter function has been updated to accommodate the new VotePosition structure. Previously, the function retrieved voting data as simple numeric values (u128) representing the applied voting power. Now, it extracts detailed information from the VotePosition structure, which includes additional metadata fields.
-    //The function now accesses the created_at and was_revalidated fields from the VotePosition structure and includes them in the VotableObjectJSON output.
-    //This provides more context about each voting position, such as when it was created and whether it has been revalidated.
+    //The get_votes_by_voter function has been updated to accommodate the new VotePosition structure. Previously, the function retrieved voting data as simple numeric values (u128) representing the applied voting power. Now, it extracts detailed information from the VotePosition structure, which includes additional metadata field.
+    //The function now accesses the created_at field from the VotePosition structure and includes them in the VotableObjectJSON output.
+    //This provides more context about each voting position, such as when it was created
     pub fn get_votes_by_voter(&self, voter_id: VoterId) -> Vec<VotableObjectJSON> {
         let mut results: Vec<VotableObjectJSON> = Vec::new();
         let voter = self.internal_get_voter(&voter_id);

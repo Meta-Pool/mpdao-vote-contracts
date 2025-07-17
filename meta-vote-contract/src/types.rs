@@ -31,9 +31,6 @@ pub struct LockingPositionJSON {
 //created_at
 //This field represents the timestamp (in milliseconds since the Unix epoch) when the object was created.
 //It provides a way to track the creation time of the object, which can be useful for auditing, sorting, or filtering objects based on their age.
-//was_revalidated
-//This field is a boolean flag indicating whether the object has been revalidated.
-//This field can help track the state of the object and whether it has undergone any revalidation processes.
 #[near(serializers = [json])]
 pub struct VotableObjectJSON {
     pub votable_contract: String,
@@ -44,9 +41,6 @@ pub struct VotableObjectJSON {
 //created_at
 //This field represents the timestamp (in milliseconds since the Unix epoch) when the object was created.
 //It provides a way to track the creation time of the object, which can be useful for auditing, sorting, or filtering objects based on their age.
-//was_revalidated
-//This field is a boolean flag indicating whether the object has been revalidated.
-//This field can help track the state of the object and whether it has undergone any revalidation processes.
 #[derive(Debug)]
 #[near(serializers = [json])]
 pub struct VotePositionJSON {
