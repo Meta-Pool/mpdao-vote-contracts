@@ -777,6 +777,38 @@ impl MetaVoteContract {
         // save voter
         self.voters.insert(&voter_id, &voter);
     }
+
+    pub fn revalidate_vote(&mut self, contract_address: ContractAddress, votable_object_id: VotableObjId) {
+        let voter_id = env::predecessor_account_id().to_string();
+        self.internal_revalidate_vote(&voter_id, &contract_address, &votable_object_id);
+    }
+
+    fn internal_revalidate_vote(
+        &mut self,
+        voter_id: &String,
+        contract_address: &ContractAddress,
+        votable_object_id: &VotableObjId,
+    ) {
+        let mut voter = self.internal_get_voter_or_panic(voter_id);
+        let mut votes_for_address = voter.get_vote_position_for_address(voter_id, contract_address);
+        let mut vote_position = votes_for_address
+            .get(votable_object_id)
+            .expect("Cannot revalidate a non-existing vote.");
+
+        vote_position.created_at = env::block_timestamp_ms();
+
+        votes_for_address.insert(votable_object_id, &vote_position);
+        voter.vote_positions.insert(contract_address, &votes_for_address);
+        self.voters.insert(voter_id, &voter);
+
+        log!(
+            "REVALIDATE: {} updated vote on object {} at address {} with new timestamp.",
+            voter_id,
+            votable_object_id,
+            contract_address.as_str()
+        );
+    }
+
     // *********
     // * Admin *
     // *********
