@@ -23,7 +23,6 @@ pub struct VoterJSON {
 pub struct VotePosition {
     pub voting_power: u128,
     pub created_at: EpochMillis,
-    pub was_revalidated: bool,
 }
 
 //The change in the Voter structure modifies the vote_positions field. Previously, it used UnorderedMap<ContractAddress, UnorderedMap<VotableObjId, u128>>, where the value for each VotableObjId was a simple numeric voting power (u128). Now, it uses UnorderedMap<ContractAddress, UnorderedMap<VotableObjId, VotePosition>>, where the value is a VotePosition structure.
@@ -174,7 +173,6 @@ impl Voter {
                     votable_object_id: obj,
                     voting_power: value.voting_power.into(),
                     created_at: value.created_at,
-                    was_revalidated: value.was_revalidated,
                 });
             }
         }

@@ -589,7 +589,6 @@ impl MetaVoteContract {
         let mut votes = votes_for_address.get(&votable_object_id).unwrap_or(VotePosition {
             voting_power: 0,
             created_at: env::block_timestamp() / 1_000_000,
-            was_revalidated: false,
         });
         voter.available_voting_power -= voting_power;
         votes.voting_power += voting_power;
@@ -781,7 +780,6 @@ impl MetaVoteContract {
         // save voter
         self.voters.insert(&voter_id, &voter);
     }
-
     // *********
     // * Admin *
     // *********

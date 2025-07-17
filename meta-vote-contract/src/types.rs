@@ -40,7 +40,6 @@ pub struct VotableObjectJSON {
     pub id: VotableObjId,
     pub current_votes: U128,
     pub created_at: EpochMillis,
-    pub was_revalidated: bool,
 }
 //created_at
 //This field represents the timestamp (in milliseconds since the Unix epoch) when the object was created.
@@ -55,5 +54,4 @@ pub struct VotePositionJSON {
     pub votable_object_id: String,
     pub voting_power: U128,
     pub created_at: EpochMillis,
-    pub was_revalidated: bool,
 }

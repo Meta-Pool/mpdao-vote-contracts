@@ -237,7 +237,6 @@ impl MetaVoteContract {
                 id,
                 current_votes: applied_voting_power.into(),
                 created_at: 0,
-                was_revalidated: false,
             })
         }
         results.sort_by_key(|v| v.current_votes.0);
@@ -258,7 +257,6 @@ impl MetaVoteContract {
                     id,
                     current_votes: vote_position.voting_power.into(),
                     created_at: vote_position.created_at,
-                    was_revalidated: vote_position.was_revalidated,
                 });
             }
         }
