@@ -2,13 +2,15 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-use near_sdk::{
-    testing_env, AccountId, Balance, Gas, MockedBlockchain, PromiseResult, PublicKey, VMContext, ONE_NEAR,
-};
-
 use crate::{types::*, utils::proportional, E18, ONE_MPDAO};
+use near_sdk::{testing_env, Gas, MockedBlockchain, PromiseResult, PublicKey, VMContext};
+use near_sdk::{AccountId, NearToken};
+use std::convert::TryFrom;
 
 use super::E6;
+
+pub type Balance = u128;
+pub const ONE_NEAR: Balance = 1_000_000_000_000_000_000_000_000;
 
 pub const E24: u128 = ONE_NEAR;
 pub const LOCKUP_NEAR: u128 = 1000;
@@ -24,59 +26,86 @@ pub const MIN_DEPOSIT_AMOUNT: u128 = 1 * E6; // 1 mpDao
 pub const MAX_LOCKING_POSITIONS: u8 = 20;
 pub const MAX_VOTING_POSITIONS: u8 = 100;
 
+/// Returns the system account used for testing purposes.
+///
+/// # Evolution:
+/// Previously, we used `AccountId::new_unchecked(...)`, but this method was removed
+/// from the public NEAR SDK API because it allowed constructing account IDs without validation.
+/// This was unsafe and discouraged in favor of proper parsing.
+///
+/// We now use `"account_id".parse::<AccountId>().unwrap()`, which relies on the `FromStr`
+/// implementation for `AccountId`. This ensures the account ID string is validated at runtime,
+/// which is appropriate for test environments.
+///
+/// Using `.unwrap()` is acceptable here since we control the input and know it's valid.
+/// In production code, prefer handling the potential error explicitly.
+///
+/// # Example:
+/// ```
+/// let system = system_account();
+/// assert_eq!(system.as_str(), "system.metavote.near");
+/// ```
 pub fn system_account() -> AccountId {
-    AccountId::new_unchecked("system.metavote.near".to_string())
+    "system.metavote.near".parse::<AccountId>().unwrap()
 }
 
 pub fn contract_account() -> AccountId {
-    AccountId::new_unchecked("contract.metavote.near".to_string())
+    "contract.metavote.near".parse::<AccountId>().unwrap()
 }
 
 pub fn treasury_account() -> AccountId {
-    AccountId::new_unchecked("treasury.metavote.near".to_string())
+    "treasury.metavote.near".parse::<AccountId>().unwrap()
 }
 
 pub fn owner_account() -> AccountId {
-    AccountId::new_unchecked("owner.metavote.near".to_string())
+    "owner.metavote.near".parse::<AccountId>().unwrap()
 }
 
 pub fn non_owner() -> AccountId {
-    AccountId::new_unchecked("non_owner.metavote.near".to_string())
+    "non_owner.metavote.near".parse::<AccountId>().unwrap()
 }
 
 pub fn developer_account() -> AccountId {
-    AccountId::new_unchecked("developer.metavote.near".to_string())
+    "developer.metavote.near".parse::<AccountId>().unwrap()
 }
 
 pub fn operator_account() -> AccountId {
-    AccountId::new_unchecked("operator.metavote.near".to_string())
+    "operator.metavote.near".parse::<AccountId>().unwrap()
 }
 
 pub fn mpdao_token_account() -> AccountId {
-    AccountId::new_unchecked("mpdao-token.metavote.near".to_string())
+    "mpdao-token.metavote.near".parse::<AccountId>().unwrap()
 }
 
 pub fn meta_pool_account() -> AccountId {
-    AccountId::new_unchecked("meta-pool.metavote.near".to_string())
+    "meta-pool.metavote.near".parse::<AccountId>().unwrap()
 }
 
 pub fn voter_account() -> AccountId {
-    AccountId::new_unchecked("voter.metavote.near".to_string())
+    "voter.metavote.near".parse::<AccountId>().unwrap()
 }
 
+/// Returns a synthetic voter account ID for testing, e.g. `voter_acc_1.near`.
+///
+/// # Notes:
+/// This replaces the deprecated `AccountId::new_unvalidated(...)` approach with a
+/// validated one using `.parse::<AccountId>()`.
+///
+/// While `.unwrap()` is acceptable in tests where inputs are controlled, make sure
+/// that the resulting account ID string is always valid according to NEAR account naming rules.
 pub fn voter_account_id(id: u8) -> AccountId {
-    AccountId::new_unchecked(format!("voter_acc_{}.near", id))
+    format!("voter_acc_{}.near", id).parse::<AccountId>().unwrap()
 }
 
 pub fn compose_account_string(suffix: &str) -> String {
     format!("account_{}.near", suffix)
 }
-pub fn compose_account(suffix: &str) -> AccountId {
-    AccountId::new_unchecked(compose_account_string(suffix))
-}
 
+pub fn compose_account(suffix: &str) -> AccountId {
+    compose_account_string(suffix).parse::<AccountId>().unwrap()
+}
 pub fn votable_account() -> AccountId {
-    AccountId::new_unchecked("votable.metavote.near".to_string())
+    "votable.metavote.near".parse::<AccountId>().unwrap()
 }
 
 pub fn ntoy(near_amount: u128) -> u128 {
@@ -126,9 +155,7 @@ pub fn get_context(
     account_locked_balance: u128,
     block_timestamp: u64,
 ) -> VMContext {
-    let ed: PublicKey = "ed25519:6E8sCci9badyRkXb3JoRpBj5p8C6Tw41ELDZoiihKEtp"
-        .parse()
-        .unwrap();
+    let ed: PublicKey = "ed25519:6E8sCci9badyRkXb3JoRpBj5p8C6Tw41ELDZoiihKEtp".parse().unwrap();
     let seed: [u8; 32] = [0; 32];
     VMContext {
         current_account_id: contract_account(),
@@ -139,11 +166,11 @@ pub fn get_context(
         block_index: 1,
         block_timestamp,
         epoch_height: 1,
-        account_balance,
-        account_locked_balance,
+        account_balance: NearToken::from_yoctonear(account_balance),
+        account_locked_balance: NearToken::from_yoctonear(account_locked_balance),
         storage_usage: 10u64.pow(6),
-        attached_deposit: 0,
-        prepaid_gas: Gas(10u64.pow(15)),
+        attached_deposit: NearToken::from_yoctonear(0),
+        prepaid_gas: Gas::from_gas(10u64.pow(15)),
         random_seed: seed,
         view_config: None,
         output_data_receivers: Vec::new(),

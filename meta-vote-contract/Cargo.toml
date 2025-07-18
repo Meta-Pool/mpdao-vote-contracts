@@ -31,6 +31,6 @@ container_build_command = [
 ]
 
 [dependencies]
-near-sdk = "5.15.1"
+near-sdk = {version = "5.15.1", features = ["unit-testing"]}
 near-contract-standards = "5.15.1"
 uint = "0.9.3"
