@@ -828,8 +828,7 @@ impl MetaVoteContract {
         assert_eq!(
             caller.as_str(),
             expected_bot,
-            "Only the authorizated bot can execute this function.",
-            expected_bot
+            "Only the authorized bot can execute this function."
         );
     }
 
