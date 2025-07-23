@@ -824,7 +824,16 @@ impl MetaVoteContract {
 
     fn assert_only_bot(&self) {
         let caller = env::predecessor_account_id();
-        let expected_bot = "bot-account.testnet";
+        let current_contract = env::current_account_id();
+
+        let expected_bot = if current_contract.as_str().ends_with(".testnet") {
+            "mpdao-vote-v004.testnet"
+        } else if current_contract.as_str().ends_with(".near") {
+            "bot-account.near"
+        } else {
+            panic!("Unknown network: {}", current_contract);
+        };
+
         assert_eq!(
             caller.as_str(),
             expected_bot,
