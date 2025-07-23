@@ -6,8 +6,8 @@ edition = "2018"
 
 [dependencies]
 near-units = "0.2.0"
-near-sdk = "4.0.0"
-near-workspaces = "0.10.0"
+near-sdk = "5.15.1"
+near-workspaces = "0.20.1"
 anyhow = "1.0"
 json = "~0.12.4"
 chrono="0.4.31"

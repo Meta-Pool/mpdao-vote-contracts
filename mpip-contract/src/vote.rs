@@ -1,30 +1,31 @@
 use crate::types::{MpipId, VoterId};
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
-use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::{near, AccountId};
 
 /// Vote Types
-#[derive(Serialize, Deserialize, Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq)]
-#[serde(crate = "near_sdk::serde")]
+#[derive(Debug, Clone, PartialEq)]
+#[near(serializers = [borsh, json])]
 pub enum VoteType {
     Against,
     For,
     Abstain,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(crate = "near_sdk::serde")]
+#[derive(Debug)]
+#[near(serializers = [json])]
 pub struct VoteJson {
     pub mpip_id: MpipId,
-    pub voter_id: VoterId,
+
+    pub voter_id: AccountId,
     pub vote_type: VoteType,
+
     pub voting_power: U128,
     pub memo: String,
     // pub already_withdrawn: bool
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, PartialEq, Clone)]
-#[serde(crate = "near_sdk::serde")]
+#[derive(PartialEq, Clone)]
+#[near(serializers = [borsh, json])]
 pub struct Vote {
     pub mpip_id: MpipId,
     pub vote_type: VoteType,

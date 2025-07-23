@@ -1,11 +1,11 @@
 use crate::constants::*;
 use crate::interface::*;
 use mpip::{Mpip, MpipJSON, MpipState};
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_contract_standards::fungible_token::Balance;
 use near_sdk::collections::unordered_map::UnorderedMap;
 use near_sdk::json_types::U128;
 use near_sdk::json_types::U64;
-use near_sdk::{env, log, near_bindgen, require, AccountId, Balance, PanicOnDefault, Promise};
+use near_sdk::{env, log, near, require, AccountId, NearToken, PanicOnDefault, Promise};
 use types::*;
 use utils::get_current_epoch_millis;
 use vote::{Vote, VoteJson, VoteType};
@@ -22,8 +22,8 @@ mod vote;
 mod vote_counting;
 mod voter;
 
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[near(contract_state)]
+#[derive(PanicOnDefault)]
 pub struct MpipContract {
     pub admin_id: AccountId,
     pub operator_id: AccountId,
@@ -60,7 +60,7 @@ pub struct MpipContract {
     pub quorum_floor: BasisPoints,
 }
 
-#[near_bindgen]
+#[near]
 impl MpipContract {
     #[init]
     pub fn new(
@@ -124,7 +124,7 @@ impl MpipContract {
 
     pub fn pay_to_account(&mut self, amount: U128, to: AccountId) -> Promise {
         self.assert_only_admin();
-        Promise::new(to).transfer(amount.0)
+        Promise::new(to).transfer(NearToken::from_yoctonear(amount.0))
     }
 
     // ************
@@ -179,7 +179,7 @@ impl MpipContract {
         self.assert_proposal_is_active_or_draft(mpip_id);
         ext_metavote::ext(self.meta_vote_contract_address.clone())
             .with_static_gas(GAS_FOR_GET_VOTING_POWER)
-            .with_attached_deposit(1)
+            .with_attached_deposit(NearToken::from_yoctonear(1))
             .get_total_voting_power()
             .then(
                 Self::ext(env::current_account_id())
@@ -217,7 +217,7 @@ impl MpipContract {
         self.assert_proposal_storage_is_covered();
         ext_metavote::ext(self.meta_vote_contract_address.clone())
             .with_static_gas(GAS_FOR_GET_VOTING_POWER)
-            .with_attached_deposit(1)
+            .with_attached_deposit(NearToken::from_yoctonear(1))
             .get_all_locking_positions(env::predecessor_account_id())
             .then(
                 Self::ext(env::current_account_id())
@@ -382,12 +382,18 @@ impl MpipContract {
         self.vote_proposal_internal(mpip_id, vote, 0, memo);
     }
 
-    pub(crate) fn vote_proposal_internal(&mut self, mpip_id: MpipId, vote: VoteType, limit_vp: u128, memo: String) {
+    pub(crate) fn vote_proposal_internal(
+        &mut self,
+        mpip_id: MpipId,
+        vote: VoteType,
+        limit_vp: u128,
+        memo: String,
+    ) {
         self.assert_proposal_is_on_voting(&mpip_id);
         self.assert_has_not_voted(mpip_id, env::predecessor_account_id());
         ext_metavote::ext(self.meta_vote_contract_address.clone())
             .with_static_gas(GAS_FOR_GET_VOTING_POWER)
-            .with_attached_deposit(1)
+            .with_attached_deposit(NearToken::from_yoctonear(1))
             .get_all_locking_positions(env::predecessor_account_id())
             .then(
                 Self::ext(env::current_account_id())

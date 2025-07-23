@@ -1,19 +1,11 @@
-use crate::types::*;
-use crate::{voter::VoterJSON, MetaVoteContract, MetaVoteContractExt, StorageKey};
-use near_sdk::{
-    collections::UnorderedMap,
-    json_types::{U128, U64},
-    near_bindgen,
-    serde::Serialize,
-};
-
-type U128String = U128;
+use crate::*;
 
 /**********************/
 /*   View functions   */
 /**********************/
-#[derive(Serialize)]
-#[serde(crate = "near_sdk::serde")]
+
+#[derive(Debug)]
+#[near(serializers = [json])]
 pub struct ContractInfoJson {
     pub owner_id: String,
     pub operator_id: String,
@@ -21,23 +13,23 @@ pub struct ContractInfoJson {
     pub min_unbond_period: u16,
     pub min_claim_and_bond_days: u16,
     pub max_unbond_period: u16,
-    pub min_deposit_amount: U128String,
+    pub min_deposit_amount: U128,
     pub max_locking_positions: u8,
     pub max_voting_positions: u8,
     pub mpdao_token_contract_address: String,
     pub stnear_token_contract_address: String,
-    pub registration_cost: U128String,
+    pub registration_cost: U128,
     pub prev_governance_contract: String,
-    pub accumulated_mpdao_distributed_for_claims: U128String,
-    pub total_unclaimed_mpdao: U128String,
-    pub accum_distributed_stnear_for_claims: U128String,
-    pub total_unclaimed_stnear: U128String,
+    pub accumulated_mpdao_distributed_for_claims: U128,
+    pub total_unclaimed_mpdao: U128,
+    pub accum_distributed_stnear_for_claims: U128,
+    pub total_unclaimed_stnear: U128,
     pub evm_delegates_count: u64,
-    pub mpdao_per_near_e24: U128String,
-    pub mpdao_avail_to_sell: U128String,
+    pub mpdao_per_near_e24: U128,
+    pub mpdao_avail_to_sell: U128,
 }
 
-#[near_bindgen]
+#[near]
 impl MetaVoteContract {
     pub fn get_owner_id(&self) -> String {
         self.owner_id.to_string()
@@ -61,9 +53,7 @@ impl MetaVoteContract {
             stnear_token_contract_address: self.stnear_token_contract_address.as_str().into(),
             registration_cost: self.registration_cost.into(),
             prev_governance_contract: self.prev_governance_contract.as_str().into(),
-            accumulated_mpdao_distributed_for_claims: self
-                .accumulated_mpdao_distributed_for_claims
-                .into(),
+            accumulated_mpdao_distributed_for_claims: self.accumulated_mpdao_distributed_for_claims.into(),
             total_unclaimed_mpdao: self.total_unclaimed_mpdao.into(),
             accum_distributed_stnear_for_claims: self.accum_distributed_stnear_for_claims.into(),
             total_unclaimed_stnear: self.total_unclaimed_stnear.into(),
@@ -78,7 +68,7 @@ impl MetaVoteContract {
     }
 
     /** all users accumulated vp */
-    pub fn get_total_voting_power(&self) -> U128String {
+    pub fn get_total_voting_power(&self) -> U128 {
         self.total_voting_power.into()
     }
 
@@ -113,28 +103,22 @@ impl MetaVoteContract {
         results
     }
 
-    pub fn get_balance(&self, voter_id: VoterId) -> U128String {
+    pub fn get_balance(&self, voter_id: VoterId) -> U128 {
         let voter = self.internal_get_voter(&voter_id);
         let balance = voter.balance + voter.sum_unlocked();
         balance.into()
     }
 
-    pub fn get_claimable_mpdao(&self, voter_id: &VoterId) -> U128String {
-        self.claimable_mpdao
-            .get(&voter_id)
-            .unwrap_or_default()
-            .into()
+    pub fn get_claimable_mpdao(&self, voter_id: &VoterId) -> U128 {
+        self.claimable_mpdao.get(&voter_id).unwrap_or_default().into()
     }
     // kept to not break public interface
-    pub fn get_claimable_meta(&self, voter_id: &VoterId) -> U128String {
+    pub fn get_claimable_meta(&self, voter_id: &VoterId) -> U128 {
         self.get_claimable_mpdao(voter_id)
     }
 
-    pub fn get_claimable_stnear(&self, voter_id: &VoterId) -> U128String {
-        self.claimable_stnear
-            .get(&voter_id)
-            .unwrap_or_default()
-            .into()
+    pub fn get_claimable_stnear(&self, voter_id: &VoterId) -> U128 {
+        self.claimable_stnear.get(&voter_id).unwrap_or_default().into()
     }
 
     // get all claims
@@ -143,8 +127,8 @@ impl MetaVoteContract {
         map: &UnorderedMap<VoterId, u128>,
         from_index: u32,
         limit: u32,
-    ) -> Vec<(String, U128String)> {
-        let mut results = Vec::<(String, U128String)>::new();
+    ) -> Vec<(String, U128)> {
+        let mut results = Vec::<(String, U128)>::new();
         let keys = map.keys_as_vector();
         let start = from_index as u64;
         let limit = limit as u64;
@@ -157,36 +141,36 @@ impl MetaVoteContract {
     }
 
     // get all stNEAR claims
-    pub fn get_stnear_claims(&self, from_index: u32, limit: u32) -> Vec<(String, U128String)> {
+    pub fn get_stnear_claims(&self, from_index: u32, limit: u32) -> Vec<(String, U128)> {
         self.internal_get_claims(&self.claimable_stnear, from_index, limit)
     }
 
     // get all mpDAO claims
-    pub fn get_claims(&self, from_index: u32, limit: u32) -> Vec<(String, U128String)> {
+    pub fn get_claims(&self, from_index: u32, limit: u32) -> Vec<(String, U128)> {
         self.internal_get_claims(&self.claimable_mpdao, from_index, limit)
     }
 
-    pub fn get_locked_balance(&self, voter_id: VoterId) -> U128String {
+    pub fn get_locked_balance(&self, voter_id: VoterId) -> U128 {
         let voter = self.internal_get_voter(&voter_id);
         voter.sum_locked().into()
     }
 
-    pub fn get_unlocking_balance(&self, voter_id: VoterId) -> U128String {
+    pub fn get_unlocking_balance(&self, voter_id: VoterId) -> U128 {
         let voter = self.internal_get_voter(&voter_id);
         voter.sum_unlocking().into()
     }
 
-    pub fn voter_total_voting_power(&self, voter_id: VoterId) -> U128String {
+    pub fn voter_total_voting_power(&self, voter_id: VoterId) -> U128 {
         let voter = self.internal_get_voter(&voter_id);
         voter.sum_voting_power().into()
     }
 
-    pub fn get_available_voting_power(&self, voter_id: VoterId) -> U128String {
+    pub fn get_available_voting_power(&self, voter_id: VoterId) -> U128 {
         let voter = self.internal_get_voter(&voter_id);
         voter.available_voting_power.into()
     }
 
-    pub fn get_used_voting_power(&self, voter_id: VoterId) -> U128String {
+    pub fn get_used_voting_power(&self, voter_id: VoterId) -> U128 {
         let voter = self.internal_get_voter(&voter_id);
         voter.sum_used_votes().into()
     }
@@ -200,20 +184,13 @@ impl MetaVoteContract {
         let mut result = Vec::new();
         let voter = self.internal_get_voter(&voter_id);
         for index in 0..voter.locking_positions.len() {
-            let locking_position = voter
-                .locking_positions
-                .get(index)
-                .expect("Locking position not found!");
+            let locking_position = voter.locking_positions.get(index).expect("Locking position not found!");
             result.push(locking_position.to_json(Some(index)));
         }
         result
     }
 
-    pub fn get_locking_position(
-        &self,
-        index: PositionIndex,
-        voter_id: VoterId,
-    ) -> Option<LockingPositionJSON> {
+    pub fn get_locking_position(&self, index: PositionIndex, voter_id: VoterId) -> Option<LockingPositionJSON> {
         let voter = self.internal_get_voter(&voter_id);
         match voter.locking_positions.get(index) {
             Some(locking_position) => Some(locking_position.to_json(Some(index))),
@@ -222,11 +199,7 @@ impl MetaVoteContract {
     }
 
     // votes by app and votable_object
-    pub fn get_total_votes(
-        &self,
-        contract_address: ContractAddress,
-        votable_object_id: VotableObjId,
-    ) -> U128String {
+    pub fn get_total_votes(&self, contract_address: ContractAddress, votable_object_id: VotableObjId) -> U128 {
         let votes = match self.votes.get(&contract_address) {
             Some(object) => object.get(&votable_object_id).unwrap_or(0_u128),
             None => 0_u128,
@@ -236,7 +209,7 @@ impl MetaVoteContract {
 
     // votes by app (contract)
     // returns [[votable_bj_id, vote_amount],[votable_bj_id, vote_amount]...]
-    pub fn get_votes_by_app(&self, app_or_contract_address: String) -> Vec<(String, U128String)> {
+    pub fn get_votes_by_app(&self, app_or_contract_address: String) -> Vec<(String, U128)> {
         let objects = self
             .votes
             .get(&app_or_contract_address)
@@ -250,10 +223,7 @@ impl MetaVoteContract {
     }
 
     // votes by app (deprecated, use get_votes_by_app)
-    pub fn get_votes_by_contract(
-        &self,
-        contract_address: ContractAddress,
-    ) -> Vec<VotableObjectJSON> {
+    pub fn get_votes_by_contract(&self, contract_address: ContractAddress) -> Vec<VotableObjectJSON> {
         let objects = self
             .votes
             .get(&contract_address)
@@ -293,7 +263,7 @@ impl MetaVoteContract {
         voter_id: VoterId,
         contract_address: ContractAddress,
         votable_object_id: VotableObjId,
-    ) -> U128String {
+    ) -> U128 {
         let voter = self.internal_get_voter(&voter_id);
         let votes = match voter.vote_positions.get(&contract_address) {
             Some(votes_for_address) => votes_for_address.get(&votable_object_id).unwrap_or(0_u128),
@@ -303,19 +273,19 @@ impl MetaVoteContract {
     }
 
     // query current meta ready for distribution
-    pub fn get_total_unclaimed_mpdao(&self) -> U128String {
+    pub fn get_total_unclaimed_mpdao(&self) -> U128 {
         self.total_unclaimed_mpdao.into()
     }
     // kept to not break public interface
-    pub fn get_total_unclaimed_meta(&self) -> U128String {
+    pub fn get_total_unclaimed_meta(&self) -> U128 {
         self.get_total_unclaimed_mpdao()
     }
     // query total_distributed mpdao for claims
-    pub fn get_accumulated_mpdao_distributed_for_claims(&self) -> U128String {
+    pub fn get_accumulated_mpdao_distributed_for_claims(&self) -> U128 {
         self.accumulated_mpdao_distributed_for_claims.into()
     }
     // kept to not break public interface
-    pub fn get_accumulated_distributed_for_claims(&self) -> U128String {
+    pub fn get_accumulated_distributed_for_claims(&self) -> U128 {
         self.get_accumulated_mpdao_distributed_for_claims()
     }
 }

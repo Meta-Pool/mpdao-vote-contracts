@@ -123,7 +123,7 @@ pub fn get_total_votes(
 
 // votes by app (contract)
 // returns [[votable_bj_id, vote_amount],[votable_bj_id, vote_amount]...]
-pub fn get_votes_by_app(&self, app_or_contract_address: String) -> Vec<(String, U128String)>;
+pub fn get_votes_by_app(&self, app_or_contract_address: String) -> Vec<(String, U128)>;
 
 pub fn get_votes_by_voter(
     &self,
@@ -224,7 +224,7 @@ To Lock funds into the Meta Vote contract, the user must define an amount in the
 
 - To reclaim the mpDAO tokens, you will have start the unbonding and then wait the unbonding period.
 
-- During the unbonding period, you can not vote and you will not get paid. 
+- During the unbonding period, you can not vote and you will not get paid.
 
 - During the unbonding period, you can chose to re-lock the tokens to be able vote and get paid again. After the voting is over, you can also chose to continue the unbonding process where you left.
 

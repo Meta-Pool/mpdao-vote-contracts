@@ -4,15 +4,12 @@ members = [
     "kv-store-contract",
     "mpip-contract",
     "test-meta-token",
-    "near-workspaces-integration-test"
+#    "near-workspaces-integration-test"
 ]
 resolver = "2"
 
-[patch.crates-io]
-parity-secp256k1 = { git = 'https://github.com/paritytech/rust-secp256k1.git' }
-
 [profile.release]
-codegen-units=1
+codegen-units = 1
 opt-level = "z"
 lto = true
 debug = false

@@ -1,29 +1,23 @@
 use near_sdk::{
-    assert_one_yocto,
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    collections::unordered_map::UnorderedMap,
-    env,
-    json_types::U64,
-    near_bindgen, require, AccountId, BorshStorageKey, PanicOnDefault,
+    assert_one_yocto, collections::unordered_map::UnorderedMap, env, json_types::U64, near,
+    require, AccountId, BorshStorageKey, PanicOnDefault,
 };
 
-//pub type U128String = U128;
-
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
-
+#[near(contract_state)]
+#[derive(PanicOnDefault)]
 pub struct KVStoreContract {
     pub owner_id: AccountId,
     pub operator_id: AccountId,
     pub associated_user_data: UnorderedMap<String, String>, // account => encrypted_data
 }
 
-#[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)]
+#[derive(BorshStorageKey)]
+#[near(serializers = [borsh])]
 pub enum StorageKey {
     AssociatedUserData,
 }
 
-#[near_bindgen]
+#[near]
 impl KVStoreContract {
     #[init]
     pub fn new(owner_id: AccountId, operator_id: AccountId) -> Self {

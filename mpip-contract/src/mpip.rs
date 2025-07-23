@@ -1,13 +1,10 @@
 use crate::*;
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::serde::{Deserialize, Serialize};
 
 // /////////////////
 // Comment struct //
 // /////////////////
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
-#[serde(crate = "near_sdk::serde")]
+#[near(serializers = [json, borsh])]
 pub enum MpipState {
     Draft,  // proposer share the idea. Giving awareness from the community via discussion or poll
     Active, // reviewed and accepted by managers
@@ -18,8 +15,7 @@ pub enum MpipState {
     Canceled, // canceled by manager after community awareness
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(crate = "near_sdk::serde")]
+#[near(serializers = [json])]
 pub struct MpipJSON {
     pub mpip_id: MpipId,
     pub title: String,
@@ -28,17 +24,18 @@ pub struct MpipJSON {
     // pub comments: String,
     pub data: String,
     pub extra: String,
+
     pub creator_id: AccountId,
     pub vote_start_timestamp: Option<EpochMillis>,
     pub vote_end_timestamp: Option<EpochMillis>,
     pub draft: bool,
     pub executed: bool,
     pub canceled: bool,
-    v_power_quorum_to_reach: Option<U128>
+
+    pub v_power_quorum_to_reach: Option<U128>,
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize)]
-#[serde(crate = "near_sdk::serde")]
+#[near(serializers = [borsh, json])]
 pub struct Mpip {
     pub mpip_id: MpipId,
     pub title: String,
@@ -102,7 +99,7 @@ impl Mpip {
             executed: self.executed,
             canceled: self.canceled,
             draft: self.draft,
-            v_power_quorum_to_reach: quorum_to_reach
+            v_power_quorum_to_reach: quorum_to_reach,
         }
     }
 }
@@ -128,10 +125,7 @@ impl MpipContract {
         proposal.mpip_id.into()
     }
 
-    pub(crate) fn internal_get_proposal_state(
-        &self,
-        mpip_id: MpipId
-    ) -> MpipState {
+    pub(crate) fn internal_get_proposal_state(&self, mpip_id: MpipId) -> MpipState {
         let proposal = self.internal_get_proposal(&mpip_id);
         if proposal.executed {
             return MpipState::Executed;
@@ -147,9 +141,7 @@ impl MpipContract {
             return MpipState::Active;
         }
 
-        if self.internal_is_quorum_reached(mpip_id)
-            && self.get_proposal_vote_succeeded(mpip_id)
-        {
+        if self.internal_is_quorum_reached(mpip_id) && self.get_proposal_vote_succeeded(mpip_id) {
             return MpipState::Accepted;
         } else {
             return MpipState::Rejected;

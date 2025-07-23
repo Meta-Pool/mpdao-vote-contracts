@@ -1,7 +1,7 @@
-use crate::*;
 use crate::utils::get_current_epoch_millis;
+use crate::*;
 use near_sdk::json_types::U128;
-use near_sdk::{env, require, PromiseResult};
+use near_sdk::{env, require, NearToken, PromiseResult};
 
 impl MpipContract {
     pub(crate) fn assert_only_admin(&self) {
@@ -161,7 +161,6 @@ impl MpipContract {
         );
 
         match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
             PromiseResult::Failed => env::panic_str("Meta Vote is not available!"),
             PromiseResult::Successful(result) => {
                 let v_power = near_sdk::serde_json::from_slice::<U128>(&result).unwrap();
@@ -177,7 +176,6 @@ impl MpipContract {
         );
 
         match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
             PromiseResult::Failed => env::panic_str("Meta Vote is not available!"),
             PromiseResult::Successful(result) => {
                 let locking_positions =
@@ -223,7 +221,7 @@ impl MpipContract {
 
     pub(crate) fn assert_proposal_storage_is_covered(&self) {
         assert!(
-            env::attached_deposit() >= self.mpip_storage_near,
+            env::attached_deposit() >= NearToken::from_yoctonear(self.mpip_storage_near),
             "The required NEAR to create a proposal is {}",
             self.mpip_storage_near
         );

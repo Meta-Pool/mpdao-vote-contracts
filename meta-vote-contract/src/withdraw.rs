@@ -1,9 +1,7 @@
 use crate::interface::*;
 use crate::*;
-//use near_contract_standards::fungible_token::receiver;
-use near_sdk::{assert_one_yocto, json_types::U128, near_bindgen, Promise, PromiseResult};
 
-#[near_bindgen]
+#[near]
 impl MetaVoteContract {
     // ************
     // * Withdraw *
@@ -42,11 +40,7 @@ impl MetaVoteContract {
     }
 
     #[payable]
-    pub fn withdraw(
-        &mut self,
-        position_index_list: Vec<PositionIndex>,
-        amount_from_balance: U128String,
-    ) {
+    pub fn withdraw(&mut self, position_index_list: Vec<PositionIndex>, amount_from_balance: U128) {
         let amount_to_withdraw = amount_from_balance.0;
         let voter_id = env::predecessor_account_id().as_str().to_string();
         self.internal_withdraw(
@@ -75,7 +69,7 @@ impl MetaVoteContract {
     pub(crate) fn transfer_mpdao_to_voter(&mut self, voter_id: &String, amount: MpDAOAmount) {
         ext_ft::ext(self.mpdao_token_contract_address.clone())
             .with_static_gas(GAS_FOR_FT_TRANSFER)
-            .with_attached_deposit(1)
+            .with_attached_deposit(NearToken::from_yoctonear(1))
             .ft_transfer(voter_id.clone(), U128::from(amount), None)
             .then(
                 Self::ext(env::current_account_id())
@@ -83,18 +77,12 @@ impl MetaVoteContract {
                     .after_transfer_mpdao_callback(voter_id.clone(), U128::from(amount)),
             );
     }
-
     #[private]
     pub fn after_transfer_mpdao_callback(&mut self, voter_id: VoterId, amount: U128) {
         let amount = amount.0;
         match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {
-                log!(
-                    "WITHDRAW: {} mpDAO transfer to {}",
-                    amount,
-                    voter_id.to_string()
-                );
+                log!("WITHDRAW: {} mpDAO transfer to {}", amount, voter_id.to_string());
             }
             PromiseResult::Failed => {
                 log!(
@@ -107,7 +95,7 @@ impl MetaVoteContract {
         };
     }
 
-    fn restore_transfer_to_mpdao(&mut self, amount: Balance, voter_id: VoterId) {
+    fn restore_transfer_to_mpdao(&mut self, amount: u128, voter_id: VoterId) {
         let mut voter = self.internal_get_voter(&voter_id);
         voter.balance += amount;
         self.voters.insert(&voter_id, &voter);
@@ -118,11 +106,11 @@ impl MetaVoteContract {
         &self,
         source_voter: &String,
         receiver: &String,
-        amount: Balance,
+        amount: u128,
     ) -> Promise {
         ext_ft::ext(self.stnear_token_contract_address.clone())
             .with_static_gas(GAS_FOR_FT_TRANSFER)
-            .with_attached_deposit(1)
+            .with_attached_deposit(NearToken::from_yoctonear(1))
             .ft_transfer(receiver.clone(), U128::from(amount), None)
             .then(
                 Self::ext(env::current_account_id())
@@ -132,22 +120,11 @@ impl MetaVoteContract {
     }
 
     #[private]
-    pub fn after_transfer_stnear_callback(
-        &mut self,
-        source_voter: &String,
-        receiver: &String,
-        amount: U128,
-    ) {
+    pub fn after_transfer_stnear_callback(&mut self, source_voter: &String, receiver: &String, amount: U128) {
         let amount = amount.0;
         match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {
-                log!(
-                    "{} WITHDRAWN {} stNEAR to {}",
-                    source_voter,
-                    amount,
-                    receiver
-                );
+                log!("{} WITHDRAWN {} stNEAR to {}", source_voter, amount, receiver);
             }
             PromiseResult::Failed => {
                 log!(

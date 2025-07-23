@@ -1,18 +1,15 @@
 use crate::*;
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(crate = "near_sdk::serde")]
+#[derive(Debug)]
+#[near(serializers = [json])]
 pub struct VoterJSON {
     pub voter_id: String,
-    pub balance_in_contract: U128String,
+    pub balance_in_contract: U128,
     pub locking_positions: Vec<LockingPositionJSON>, // sum here to get total voting power
-    pub voting_power: U128String,                    // available voting power
+    pub voting_power: U128,                    // available voting power
     pub vote_positions: Vec<VotePositionJSON>,       // sum here to get used voting power
 }
-
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(Debug)]
+#[near(serializers = [borsh])]
 pub struct Voter {
     pub balance: MpDAOAmount,
     pub locking_positions: Vector<LockingPosition>,
@@ -85,8 +82,8 @@ impl Voter {
         result
     }
 
-    pub(crate) fn find_locked_position(&self, unbond_days: Days) -> Option<u64> {
-        let mut index = 0_u64;
+    pub(crate) fn find_locked_position(&self, unbond_days: Days) -> Option<u32> {
+        let mut index = 0_u32;
         for locking_position in self.locking_positions.iter() {
             if locking_position.locking_period == unbond_days && locking_position.is_locked() {
                 return Some(index);
@@ -97,9 +94,7 @@ impl Voter {
     }
 
     pub(crate) fn get_position(&self, index: PositionIndex) -> LockingPosition {
-        self.locking_positions
-            .get(index)
-            .expect("Index out of range!")
+        self.locking_positions.get(index).expect("IndexOutOfRange").clone()
     }
 
     pub(crate) fn remove_position(&mut self, index: PositionIndex) {
@@ -112,8 +107,9 @@ impl Voter {
         contract_address: &ContractAddress,
     ) -> UnorderedMap<VotableObjId, u128> {
         let id = format!("{}-{}", voter_id.to_string(), contract_address.as_str());
+
         self.vote_positions
-            .get(&contract_address)
+            .get(contract_address)
             .unwrap_or(UnorderedMap::new(StorageKey::VoterVotes {
                 hash_id: generate_hash_id(&id),
             }))
@@ -122,10 +118,7 @@ impl Voter {
     pub(crate) fn get_unlocked_position_indexes(&self) -> Vec<PositionIndex> {
         let mut result = Vec::new();
         for index in 0..self.locking_positions.len() {
-            let locking_position = self
-                .locking_positions
-                .get(index)
-                .expect("Locking position not found!");
+            let locking_position = self.locking_positions.get(index).expect("Locking position not found!");
             if locking_position.is_unlocked() {
                 result.push(index);
             }

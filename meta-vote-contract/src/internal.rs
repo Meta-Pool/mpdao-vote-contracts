@@ -14,29 +14,23 @@ impl MetaVoteContract {
         );
     }
 
-    pub(crate) fn assert_min_deposit_amount(&self, amount: Balance) {
-        assert!(
-            amount >= self.min_deposit_amount,
-            "Minimum deposit amount is {} mpDAO.",
-            self.min_deposit_amount
-        );
+    pub(crate) fn assert_min_deposit_amount(&self, amount: u128) {
+        require!(amount >= self.min_deposit_amount, "BelowMinimumDepositAmount");
     }
 
     /// Inner method to get or create a Voter.
     pub(crate) fn internal_get_voter(&self, voter_id: &String) -> Voter {
         self.voters.get(&voter_id).unwrap_or(Voter::new(&voter_id))
     }
+
     pub(crate) fn internal_get_voter_or_panic(&self, voter_id: &String) -> Voter {
         match self.voters.get(&voter_id) {
             Some(a) => a,
-            _ => panic!("invalid voter_id {}", voter_id),
+            _ => env::panic_str("InvalidVoterId"),
         }
     }
 
-    fn internal_get_total_votes_for_address(
-        &self,
-        contract_address: &String,
-    ) -> UnorderedMap<VotableObjId, u128> {
+    fn internal_get_total_votes_for_address(&self, contract_address: &String) -> UnorderedMap<VotableObjId, u128> {
         self.votes
             .get(&contract_address)
             .unwrap_or(UnorderedMap::new(StorageKey::ContractVotes {
@@ -105,14 +99,10 @@ impl MetaVoteContract {
         total_unclaimed: &mut u128,
         account: &String,
         amount: u128,
-        token: &str,
+        _token: &str,
     ) {
         let existing_claimable_amount = claimable_map.get(&account).unwrap_or_default();
-        assert!(
-            existing_claimable_amount >= amount,
-            "you don't have enough claimable {}",
-            token
-        );
+        require!(existing_claimable_amount >= amount, "NotEnoughClaimableTokens");
         let after_remove = existing_claimable_amount - amount;
         if after_remove == 0 {
             // 0 means remove
@@ -125,7 +115,7 @@ impl MetaVoteContract {
     }
 
     pub(crate) fn add_claimable_mpdao(&mut self, account: &String, amount: u128) {
-        assert!(amount > 0);
+        require!(amount > 0, "InvalidZeroAmount");
         Self::add_claimable(
             &mut self.claimable_mpdao,
             &mut self.total_unclaimed_mpdao,
@@ -135,7 +125,7 @@ impl MetaVoteContract {
     }
 
     pub(crate) fn add_claimable_stnear(&mut self, account: &String, amount: u128) {
-        assert!(amount > 0);
+        require!(amount > 0, "InvalidZeroAmount");
         Self::add_claimable(
             &mut self.claimable_stnear,
             &mut self.total_unclaimed_stnear,
@@ -164,12 +154,7 @@ impl MetaVoteContract {
         );
     }
 
-    pub(crate) fn claim_stnear_internal(
-        &mut self,
-        voter_id: &String,
-        receiver_id: &String,
-        amount: u128,
-    ) -> Promise {
+    pub(crate) fn claim_stnear_internal(&mut self, voter_id: &String, receiver_id: &String, amount: u128) -> Promise {
         // remove claim
         self.remove_claimable_stnear(&voter_id, amount);
         // transfer to destination
@@ -193,11 +178,6 @@ impl MetaVoteContract {
         // get beneficiary voter
         let mut beneficiary_voter = self.internal_get_voter(&beneficiary_id);
         // create/update locking position
-        self.deposit_locking_position(
-            amount,
-            locking_period,
-            &beneficiary_id,
-            &mut beneficiary_voter,
-        );
+        self.deposit_locking_position(amount, locking_period, &beneficiary_id, &mut beneficiary_voter);
     }
 }
