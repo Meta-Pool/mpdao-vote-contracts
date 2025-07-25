@@ -121,4 +121,47 @@ impl TrackerContract {
             None => vec![],
         }
     }
+
+    pub fn revalidate_vote_event(&mut self, voter_id: AccountId, contract_address: String, votable_object_id: String) {
+        // Seguridad: solo el dueño puede revalidar
+        require!(
+            env::predecessor_account_id() == voter_id,
+            "Only the owner of the vote can revalidate it"
+        );
+
+        if let Some(mut user_records) = self.records_per_user.get(&voter_id) {
+            let mut updated = false;
+            let mut kept: Vec<VoteRecord> = vec![];
+
+            for record in user_records.records.iter() {
+                if record.contract_address == contract_address && record.votable_object_id == votable_object_id {
+                    // Reemplazar con nuevo timestamp y acción "revalidate"
+                    kept.push(VoteRecord {
+                        timestamp: env::block_timestamp_ms(),
+                        contract_address: record.contract_address.clone(),
+                        votable_object_id: record.votable_object_id.clone(),
+                        voting_power: record.voting_power,
+                        action: "revalidate".to_string(),
+                    });
+                    updated = true;
+                } else {
+                    kept.push(record);
+                }
+            }
+
+            if updated {
+                let mut new_vec = Vector::new(env::sha256(voter_id.as_bytes()));
+                for r in kept {
+                    new_vec.push(&r);
+                }
+
+                self.records_per_user
+                    .insert(&voter_id, &UserRecords { records: new_vec });
+            } else {
+                env::panic_str("Vote position not found");
+            }
+        } else {
+            env::panic_str("User not found");
+        }
+    }
 }
