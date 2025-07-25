@@ -577,6 +577,21 @@ impl MetaVoteContract {
 
         // Update Meta Vote state.
         self.internal_increase_total_votes(voting_power, &contract_address, &votable_object_id);
+
+        Promise::new("kv-user-store.testnet".parse().unwrap()).function_call(
+            "register_vote_event".to_string(),
+            near_sdk::serde_json::json!({
+                "voter_id": voter_id,
+                "contract_address": contract_address,
+                "votable_object_id": votable_object_id,
+                "voting_power": U128(voting_power),
+                "action": "vote"
+            })
+            .to_string()
+            .into_bytes(),
+            NearToken::from_yoctonear(0),
+            near_sdk::Gas::from_tgas(10),
+        );
     }
 
     pub fn rebalance(
