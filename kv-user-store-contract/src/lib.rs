@@ -164,4 +164,16 @@ impl TrackerContract {
             env::panic_str("User not found");
         }
     }
+
+    pub fn get_all_vote_records(&self) -> Vec<(AccountId, VoteRecord)> {
+        let mut result = vec![];
+
+        for (account_id, user_records) in self.records_per_user.iter() {
+            for record in user_records.records.iter() {
+                result.push((account_id.clone(), record));
+            }
+        }
+
+        result
+    }
 }
