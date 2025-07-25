@@ -14,7 +14,7 @@ pub struct VoteRecord {
     pub contract_address: String,
     pub votable_object_id: String,
     pub voting_power: U128,
-    pub action: String, // "vote", "revalidate", "unvote"
+    pub action: String, // "vote", "revalidate"
 }
 
 #[near(serializers = [borsh])]
@@ -66,7 +66,7 @@ impl TrackerContract {
         for record in user_records.records.iter() {
             if record.contract_address == contract_address && record.votable_object_id == votable_object_id {
                 accumulated_power += record.voting_power.0;
-                // reemplazamos la posicion por una nueva con la suma de ambos votig power
+                // Replace the position for a new one with the sum of both voting powers
             } else {
                 kept.push(record);
             }
@@ -90,7 +90,7 @@ impl TrackerContract {
     }
 
     pub fn remove_vote_event(&mut self, voter_id: AccountId, contract_address: String, votable_object_id: String) {
-        // 🔐 Seguridad: solo el dueño puede eliminar su voto
+        // Only owner can remove their own position
         require!(
             env::predecessor_account_id() == voter_id,
             "Only the owner of the vote can remove it"
@@ -123,7 +123,7 @@ impl TrackerContract {
     }
 
     pub fn revalidate_vote_event(&mut self, voter_id: AccountId, contract_address: String, votable_object_id: String) {
-        // Seguridad: solo el dueño puede revalidar
+        // Only owner can revalidate
         require!(
             env::predecessor_account_id() == voter_id,
             "Only the owner of the vote can revalidate it"
@@ -135,7 +135,7 @@ impl TrackerContract {
 
             for record in user_records.records.iter() {
                 if record.contract_address == contract_address && record.votable_object_id == votable_object_id {
-                    // Reemplazar con nuevo timestamp y acción "revalidate"
+                    // Replace with new timestamp and action revalidate
                     kept.push(VoteRecord {
                         timestamp: env::block_timestamp_ms(),
                         contract_address: record.contract_address.clone(),
