@@ -1,0 +1,6 @@
+[toolchain]
+#channel = "1.81.0" use 1.81.0 for deploying contracts. use stable for testing.
+# channel = "stable"
+channel = "1.85.0"
+components = ["rustfmt"]
+targets = ["wasm32-unknown-unknown"]

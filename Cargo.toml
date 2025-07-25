@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "meta-vote-contract",
+    "kv-user-store-contract",
     "kv-store-contract",
     "mpip-contract",
     "test-meta-token",
