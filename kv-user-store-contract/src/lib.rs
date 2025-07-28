@@ -90,10 +90,12 @@ impl TrackerContract {
     }
 
     pub fn remove_vote_event(&mut self, voter_id: AccountId, contract_address: String, votable_object_id: String) {
-        // Only owner can remove their own position
+        const BOT_ACCOUNT: &str = "bot-account.testnet";
+
+        // Only the bot can execute this function
         require!(
-            env::predecessor_account_id() == voter_id,
-            "Only the owner of the vote can remove it"
+            env::predecessor_account_id().as_str() == BOT_ACCOUNT,
+            "Only the authorized bot can remove votes"
         );
 
         if let Some(mut user_records) = self.records_per_user.get(&voter_id) {
