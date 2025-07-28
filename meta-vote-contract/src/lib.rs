@@ -737,6 +737,40 @@ impl MetaVoteContract {
         self.voters.insert(&voter_id, &voter);
     }
 
+    pub fn purge_votes_by_list(&mut self, purge_requests: Vec<(VoterId, ContractAddress, VotableObjId)>) {
+        self.assert_only_bot();
+
+        for (voter_id, contract_address, object_id) in &purge_requests {
+            self.internal_purge_vote(&voter_id, &contract_address, &object_id);
+        }
+
+        log!(
+            "PURGE: Completed bulk purge of {} vote positions.",
+            purge_requests.len()
+        );
+    }
+
+    fn assert_only_bot(&self) {
+        let caller = env::predecessor_account_id();
+        let expected_bot = "bot-account.testnet";
+        assert_eq!(
+            caller.as_str(),
+            expected_bot,
+            "Only the authorizated bot can execute this function.",
+        );
+    }
+
+    fn internal_purge_vote(
+        &mut self,
+        voter_id: &String,
+        contract_address: &ContractAddress,
+        votable_object_id: &VotableObjId,
+    ) {
+        let mut voter_data = self.internal_get_voter_or_panic(voter_id);
+        self.internal_remove_voting_position(voter_id, &mut voter_data, contract_address, votable_object_id);
+        self.voters.insert(voter_id, &voter_data);
+    }
+
     // *********
     // * Admin *
     // *********
