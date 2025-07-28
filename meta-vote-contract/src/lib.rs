@@ -689,20 +689,6 @@ impl MetaVoteContract {
             &voter_id,
             &votable_object_id,
             contract_address.as_str()
-        );
-
-        Promise::new("kv-user-store.testnet".parse().unwrap()).function_call(
-            "remove_vote_event".to_string(),
-            near_sdk::serde_json::json!({
-                "voter_id": voter_id,
-                "contract_address": contract_address,
-                "votable_object_id": votable_object_id,
-            })
-            .to_string()
-            .into_bytes(),
-            NearToken::from_yoctonear(0),
-            near_sdk::Gas::from_tgas(10),
-        );
     }
 
     pub fn unvote(&mut self, contract_address: ContractAddress, votable_object_id: VotableObjId) {
