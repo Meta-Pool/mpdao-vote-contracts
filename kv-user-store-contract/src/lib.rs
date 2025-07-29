@@ -1,14 +1,16 @@
 use near_sdk::collections::{UnorderedMap, Vector};
 use near_sdk::json_types::U128;
-use near_sdk::{env, near, require, AccountId, BorshStorageKey};
+use near_sdk::{env, log, near, require, AccountId, BorshStorageKey, IntoStorageKey, PanicOnDefault};
 
 #[near(serializers = [borsh])]
+#[derive(BorshStorageKey)]
 pub enum StorageKey {
-    Records,
-    RecordsPerUser { account_hash: Vec<u8> },
+    RecordsPerUser,
+    RecordsVector { account_hash: Vec<u8> },
 }
 
 #[near(serializers = [borsh, json])]
+#[derive(Clone)]
 pub struct VoteRecord {
     pub timestamp: u64,
     pub contract_address: String,
@@ -22,18 +24,10 @@ pub struct UserRecords {
     pub records: Vector<VoteRecord>,
 }
 
-#[derive(BorshStorageKey)]
+#[derive(BorshStorageKey, PanicOnDefault)]
 #[near(contract_state, serializers = [borsh])]
 pub struct TrackerContract {
     pub records_per_user: UnorderedMap<AccountId, UserRecords>,
-}
-
-impl Default for TrackerContract {
-    fn default() -> Self {
-        Self {
-            records_per_user: UnorderedMap::new(b"r".to_vec()),
-        }
-    }
 }
 
 #[near]
@@ -41,7 +35,7 @@ impl TrackerContract {
     #[init]
     pub fn new() -> Self {
         Self {
-            records_per_user: UnorderedMap::new(b"r".to_vec()),
+            records_per_user: UnorderedMap::new(StorageKey::RecordsPerUser),
         }
     }
 
@@ -57,7 +51,12 @@ impl TrackerContract {
         let new_power = voting_power.0;
 
         let mut user_records = self.records_per_user.get(&voter_id).unwrap_or_else(|| UserRecords {
-            records: Vector::new(env::sha256(voter_id.as_bytes())),
+            records: Vector::new(
+                StorageKey::RecordsVector {
+                    account_hash: env::sha256(voter_id.as_bytes()),
+                }
+                .into_storage_key(),
+            ),
         });
 
         let mut accumulated_power = new_power;
@@ -72,7 +71,12 @@ impl TrackerContract {
             }
         }
 
-        let mut new_vec = Vector::new(env::sha256(voter_id.as_bytes()));
+        let mut new_vec = Vector::new(
+            StorageKey::RecordsVector {
+                account_hash: env::sha256(voter_id.as_bytes()),
+            }
+            .into_storage_key(),
+        );
         for r in kept {
             new_vec.push(&r);
         }
@@ -91,12 +95,14 @@ impl TrackerContract {
 
     pub fn remove_vote_event(&mut self, voter_id: AccountId, contract_address: String, votable_object_id: String) {
         const BOT_ACCOUNT: &str = "bot-account.testnet";
+        const CONTRACT_A: &str = "mpdao-vote-v004.testnet";
 
-        // Only the bot can execute this function
-        require!(
-            env::predecessor_account_id().as_str() == BOT_ACCOUNT,
-            "Only the authorized bot can remove votes"
-        );
+        let caller = env::predecessor_account_id();
+
+        // Authorized if caller is bot, the contract A, or the voter themselves
+        let is_authorized = caller.as_str() == BOT_ACCOUNT || caller.as_str() == CONTRACT_A || caller == voter_id;
+
+        require!(is_authorized, "Caller is not authorized to remove vote event");
 
         if let Some(mut user_records) = self.records_per_user.get(&voter_id) {
             let mut kept: Vec<VoteRecord> = vec![];
@@ -107,13 +113,27 @@ impl TrackerContract {
                 }
             }
 
-            let mut new_vec = Vector::new(env::sha256(voter_id.as_bytes()));
+            let mut new_vec = Vector::new(
+                StorageKey::RecordsVector {
+                    account_hash: env::sha256(voter_id.as_bytes()),
+                }
+                .into_storage_key(),
+            );
             for r in kept {
                 new_vec.push(&r);
             }
 
             self.records_per_user
                 .insert(&voter_id, &UserRecords { records: new_vec });
+
+            log!(
+                "Removed vote event: {} / {} for {}",
+                contract_address,
+                votable_object_id,
+                voter_id
+            );
+        } else {
+            log!("No records found for {}", voter_id);
         }
     }
 
@@ -152,7 +172,12 @@ impl TrackerContract {
             }
 
             if updated {
-                let mut new_vec = Vector::new(env::sha256(voter_id.as_bytes()));
+                let mut new_vec = Vector::new(
+                    StorageKey::RecordsVector {
+                        account_hash: env::sha256(voter_id.as_bytes()),
+                    }
+                    .into_storage_key(),
+                );
                 for r in kept {
                     new_vec.push(&r);
                 }
