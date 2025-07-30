@@ -203,4 +203,20 @@ impl TrackerContract {
 
         result
     }
+
+    pub fn get_vote_timestamp(
+        &self,
+        account_id: AccountId,
+        contract_address: String,
+        votable_object_id: String,
+    ) -> Option<u64> {
+        if let Some(user_records) = self.records_per_user.get(&account_id) {
+            for record in user_records.records.iter() {
+                if record.contract_address == contract_address && record.votable_object_id == votable_object_id {
+                    return Some(record.timestamp);
+                }
+            }
+        }
+        None
+    }
 }
