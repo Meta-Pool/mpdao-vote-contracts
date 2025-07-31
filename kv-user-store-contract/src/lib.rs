@@ -30,6 +30,16 @@ pub struct TrackerContract {
     pub records_per_user: UnorderedMap<AccountId, UserRecords>,
 }
 
+#[near(serializers = [borsh, json])]
+pub struct RawVoteInputWithVoter {
+    pub voter_id: AccountId,
+    pub timestamp: u64,
+    pub contract_address: String,
+    pub votable_object_id: String,
+    pub voting_power: U128,
+    pub action: String,
+}
+
 #[near]
 impl TrackerContract {
     #[init]
@@ -218,5 +228,66 @@ impl TrackerContract {
             }
         }
         None
+    }
+    /// Registers multiple vote positions for multiple users efficiently.
+    /// Only meant to be used via CLI, allowing arbitrary timestamps.
+    pub fn register_batch_vote_events_multi_user(&mut self, votes: Vec<RawVoteInputWithVoter>) {
+        use std::collections::HashMap;
+
+        // Group votes by voter_id
+        let mut grouped: HashMap<AccountId, Vec<RawVoteInputWithVoter>> = HashMap::new();
+        for vote in votes {
+            grouped.entry(vote.voter_id.clone()).or_insert_with(Vec::new).push(vote);
+        }
+
+        // Process each user independently
+        for (voter_id, user_votes) in grouped {
+            let account_hash = env::sha256(voter_id.as_bytes());
+
+            // Load existing records if present
+            let mut existing_records: Vec<VoteRecord> = if let Some(user_records) = self.records_per_user.get(&voter_id)
+            {
+                user_records.records.to_vec()
+            } else {
+                vec![]
+            };
+
+            // Insert existing records into a map (keyed by contract + object)
+            let mut records_map: HashMap<(String, String), VoteRecord> = HashMap::new();
+            for record in existing_records {
+                records_map.insert(
+                    (record.contract_address.clone(), record.votable_object_id.clone()),
+                    record,
+                );
+            }
+
+            // Overwrite or add new votes into the map
+            for vote in user_votes {
+                let key = (vote.contract_address.clone(), vote.votable_object_id.clone());
+                records_map.insert(
+                    key,
+                    VoteRecord {
+                        timestamp: vote.timestamp,
+                        contract_address: vote.contract_address,
+                        votable_object_id: vote.votable_object_id,
+                        voting_power: vote.voting_power,
+                        action: vote.action,
+                    },
+                );
+            }
+
+            // Rebuild the Vector from the merged records
+            let mut new_vec = Vector::new(StorageKey::RecordsVector { account_hash }.into_storage_key());
+
+            for record in records_map.values() {
+                new_vec.push(record);
+            }
+
+            // Save back to storage
+            self.records_per_user
+                .insert(&voter_id, &UserRecords { records: new_vec });
+
+            log!("Registered {} votes for {}", records_map.len(), voter_id);
+        }
     }
 }
