@@ -39,6 +39,12 @@ pub struct RawVoteInputWithVoter {
     pub voting_power: U128,
     pub action: String,
 }
+#[near(serializers = [borsh, json])]
+pub struct VoteKey {
+    pub voter_id: AccountId,
+    pub contract_address: String,
+    pub votable_object_id: String,
+}
 
 #[near]
 impl TrackerContract {
@@ -288,6 +294,58 @@ impl TrackerContract {
                 .insert(&voter_id, &UserRecords { records: new_vec });
 
             log!("Registered {} votes for {}", records_map.len(), voter_id);
+        }
+    }
+
+    pub fn remove_vote_events_batch(&mut self, purge_requests: Vec<VoteKey>) {
+        use std::collections::HashMap;
+
+        const BOT_ACCOUNT: &str = "bot-account.testnet";
+        const CONTRACT_A: &str = "mpdao-vote-v004.testnet";
+
+        let caller = env::predecessor_account_id();
+
+        // Group purge requests by user
+        let mut grouped: HashMap<AccountId, Vec<(String, String)>> = HashMap::new();
+        for req in purge_requests {
+            let is_authorized =
+                caller.as_str() == BOT_ACCOUNT || caller.as_str() == CONTRACT_A || caller == req.voter_id;
+            require!(is_authorized, &format!("Caller not authorized for {}", req.voter_id));
+
+            grouped
+                .entry(req.voter_id.clone())
+                .or_default()
+                .push((req.contract_address, req.votable_object_id));
+        }
+
+        for (voter_id, positions) in grouped {
+            if let Some(user_records) = self.records_per_user.get(&voter_id) {
+                let mut kept = vec![];
+                for record in user_records.records.iter() {
+                    let should_remove = positions
+                        .iter()
+                        .any(|(addr, obj)| record.contract_address == *addr && record.votable_object_id == *obj);
+
+                    if !should_remove {
+                        kept.push(record);
+                    }
+                }
+
+                let mut new_vec = Vector::new(
+                    StorageKey::RecordsVector {
+                        account_hash: env::sha256(voter_id.as_bytes()),
+                    }
+                    .into_storage_key(),
+                );
+
+                for r in kept {
+                    new_vec.push(&r);
+                }
+
+                self.records_per_user
+                    .insert(&voter_id, &UserRecords { records: new_vec });
+                log!("Removed {} vote(s) for {}", positions.len(), voter_id);
+            }
         }
     }
 }
