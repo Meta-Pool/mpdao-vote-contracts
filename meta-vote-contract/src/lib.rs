@@ -663,13 +663,12 @@ impl MetaVoteContract {
         contract_address: &ContractAddress,
         votable_object_id: &VotableObjId,
     ) {
-        // update this voter struct
         let mut user_votes_for_app = voter.get_vote_position_for_address(&voter_id, &contract_address);
         let user_vote_for_object = user_votes_for_app
             .get(&votable_object_id)
             .expect("Cannot unvote a Votable Object without votes.");
 
-        voter.available_voting_power += user_vote_for_object; // available voting power
+        voter.available_voting_power += user_vote_for_object;
         user_votes_for_app.remove(&votable_object_id);
 
         if user_votes_for_app.is_empty() {
@@ -677,7 +676,7 @@ impl MetaVoteContract {
         } else {
             voter.vote_positions.insert(&contract_address, &user_votes_for_app);
         }
-        // Update Meta Vote global state unordered maps
+
         self.state_internal_decrease_total_votes_for_address(
             user_vote_for_object,
             &contract_address,
@@ -691,19 +690,23 @@ impl MetaVoteContract {
             contract_address.as_str()
         );
 
-        // Cross-contract call to remove record in kv-user-store
-        Promise::new("kv-user-store.testnet".parse().unwrap()).function_call(
-            "remove_vote_event".to_string(),
-            near_sdk::serde_json::json!({
-                "voter_id": voter_id,
-                "contract_address": contract_address,
-                "votable_object_id": votable_object_id
-            })
-            .to_string()
-            .into_bytes(),
-            NearToken::from_yoctonear(0),
-            near_sdk::Gas::from_tgas(10),
-        );
+        // Only trigger the cross-contract call to kv-user-store if the caller is the actual owner of the vote.
+        // This prevents automated purge operations (e.g., by the bot) from attempting to update external records.
+        // It ensures that only user-initiated actions are allowed to modify their corresponding entries in the tracker contract.
+        if env::predecessor_account_id() == *voter_id {
+            Promise::new("kv-user-store.testnet".parse().unwrap()).function_call(
+                "remove_vote_event".to_string(),
+                near_sdk::serde_json::json!({
+                    "voter_id": voter_id,
+                    "contract_address": contract_address,
+                    "votable_object_id": votable_object_id
+                })
+                .to_string()
+                .into_bytes(),
+                NearToken::from_yoctonear(0),
+                near_sdk::Gas::from_tgas(10),
+            );
+        }
     }
 
     pub fn unvote(&mut self, contract_address: ContractAddress, votable_object_id: VotableObjId) {
