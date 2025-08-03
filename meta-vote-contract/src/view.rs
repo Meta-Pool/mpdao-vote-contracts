@@ -235,6 +235,7 @@ impl MetaVoteContract {
                 votable_contract: contract_address.to_string(),
                 id,
                 current_votes: applied_voting_power.into(),
+                vote_timestamp: None, // No specific voter context, so no timestamp
             })
         }
         results.sort_by_key(|v| v.current_votes.0);
@@ -247,10 +248,12 @@ impl MetaVoteContract {
         for contract_address in voter.vote_positions.keys_as_vector().iter() {
             let votes_for_address = voter.vote_positions.get(&contract_address).unwrap();
             for (id, applied_voting_power) in votes_for_address.iter() {
+                let timestamp = self.get_vote_timestamp(&voter_id, &contract_address, &id);
                 results.push(VotableObjectJSON {
                     votable_contract: contract_address.to_string(),
                     id,
                     current_votes: applied_voting_power.into(),
+                    vote_timestamp: timestamp,
                 })
             }
         }

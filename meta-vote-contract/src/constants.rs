@@ -1,4 +1,4 @@
-use  crate::*;
+use crate::*;
 use near_sdk::{BorshStorageKey, CryptoHash, Gas, NearToken};
 
 pub const ONE_MPDAO: u128 = 1_000_000; // MPDAO has 6 decimals
@@ -35,4 +35,5 @@ pub enum StorageKey {
     EvmDelegates,
     EvmDelegationSignatures,
     EvmPreDelegation,
+    TimestampStorage,
 }

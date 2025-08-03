@@ -5,7 +5,7 @@ use near_sdk::{
     json_types::{U128, U64},
     log, near, require,
     store::{LookupMap, Vector},
-    AccountId, NearToken, PanicOnDefault, Promise, PromiseResult,
+    AccountId, CryptoHash, NearToken, PanicOnDefault, Promise, PromiseResult,
 };
 
 use crate::{constants::*, locking_position::*, types::*, utils::*, voter::*};
@@ -17,6 +17,7 @@ mod interface;
 mod internal;
 mod locking_position;
 mod migrate;
+mod timestamp_utils;
 mod types;
 mod utils;
 mod view;
@@ -69,6 +70,9 @@ pub struct MetaVoteContract {
 
     // added 2025-03-28
     pub min_claim_and_bond_days: u16,
+
+    // timestamp storage with hashed keys
+    pub timestamp_storage: UnorderedMap<CryptoHash, u64>,
 }
 
 #[near]
@@ -123,6 +127,7 @@ impl MetaVoteContract {
             mpdao_per_near_e24: 0,
             mpdao_avail_to_sell: 0,
             min_claim_and_bond_days: min_unbond_period,
+            timestamp_storage: UnorderedMap::new(StorageKey::TimestampStorage),
         }
     }
 
@@ -575,6 +580,9 @@ impl MetaVoteContract {
         votes_for_address.insert(&votable_object_id, &votes);
         voter.vote_positions.insert(&contract_address, &votes_for_address);
 
+        // Store timestamp for this vote
+        self.store_vote_timestamp(voter_id, contract_address, votable_object_id);
+
         // Update Meta Vote state.
         self.internal_increase_total_votes(voting_power, &contract_address, &votable_object_id);
     }
@@ -611,6 +619,9 @@ impl MetaVoteContract {
             voter.available_voting_power -= additional_votes;
             votes += additional_votes;
 
+            // Update timestamp for modified vote
+            self.store_vote_timestamp(&voter_id, &contract_address, &votable_object_id);
+
             log!(
                 "VOTE: {} increased to {} votes for object {} at address {}.",
                 &voter_id,
@@ -625,6 +636,9 @@ impl MetaVoteContract {
             let remove_votes = votes - voting_power;
             voter.available_voting_power += remove_votes;
             votes -= remove_votes;
+
+            // Update timestamp for modified vote
+            self.store_vote_timestamp(&voter_id, &contract_address, &votable_object_id);
 
             log!(
                 "VOTE: {} decreased to {} votes for object {} at address {}.",
@@ -662,6 +676,10 @@ impl MetaVoteContract {
         } else {
             voter.vote_positions.insert(&contract_address, &user_votes_for_app);
         }
+
+        // Remove timestamp for this vote
+        self.remove_vote_timestamp(voter_id, contract_address, votable_object_id);
+
         // Update Meta Vote global state unordered maps
         self.state_internal_decrease_total_votes_for_address(
             user_vote_for_object,
@@ -707,6 +725,24 @@ impl MetaVoteContract {
         self.internal_remove_voting_position(&voter_id, &mut voter, &contract_address, &votable_object_id);
         // save voter
         self.voters.insert(&voter_id, &voter);
+    }
+
+    // operator bot can remove stale votes
+    pub fn remove_stale_vote(
+        &mut self,
+        voter_id: String,
+        contract_address: ContractAddress,
+        votable_object_id: VotableObjId,
+    ) {
+        self.assert_operator();
+
+        // Verify that the vote is actually stale (either no timestamp or at least 30 days old)
+        require!(
+            self.verify_vote_is_stale(&voter_id, &contract_address, &votable_object_id),
+            "Vote is not stale. Votes can only be removed if they are at least 30 days old."
+        );
+
+        self.internal_unvote(&voter_id, &contract_address, &votable_object_id)
     }
 
     // *********
