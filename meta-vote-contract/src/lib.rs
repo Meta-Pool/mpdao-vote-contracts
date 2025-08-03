@@ -735,14 +735,13 @@ impl MetaVoteContract {
         votable_object_id: VotableObjId,
     ) {
         self.assert_operator();
-
-        // Verify that the vote is actually stale (either no timestamp or at least 30 days old)
-        require!(
-            self.verify_vote_is_stale(&voter_id, &contract_address, &votable_object_id),
-            "Vote is not stale. Votes can only be removed if they are at least 30 days old."
-        );
-
         self.internal_unvote(&voter_id, &contract_address, &votable_object_id)
+    }
+
+    /// Refresh the timestamps of all votes for the calling user
+    pub fn refresh_vote_timestamps(&mut self) {
+        let voter_id = env::predecessor_account_id().to_string();
+        self.refresh_all_vote_timestamps(&voter_id);
     }
 
     // *********

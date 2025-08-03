@@ -50,23 +50,18 @@ impl crate::MetaVoteContract {
         self.timestamp_storage.remove(&hash_key);
     }
 
-    /// Verify that a vote timestamp is either None or at least 30 days old
-    pub(crate) fn verify_vote_is_stale(
-        &self,
-        voter_id: &String,
-        contract_address: &ContractAddress,
-        votable_object_id: &VotableObjId,
-    ) -> bool {
-        let timestamp = self.get_vote_timestamp(voter_id, contract_address, votable_object_id);
+    /// Refresh the timestamps of all votes for a specific voter
+    pub(crate) fn refresh_all_vote_timestamps(&mut self, voter_id: &String) {
+        let voter = self.internal_get_voter_or_panic(voter_id);
+        let current_timestamp = env::block_timestamp_ms();
 
-        match timestamp {
-            None => true, // No timestamp means it's from before timestamp tracking was implemented
-            Some(vote_timestamp) => {
-                let current_timestamp = env::block_timestamp_ms();
-                let thirty_days_ms = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+        // Iterate through all vote positions for this voter
+        for contract_address in voter.vote_positions.keys_as_vector().iter() {
+            let votes_for_address = voter.vote_positions.get(&contract_address).unwrap();
 
-                // Vote is stale if it's at least 30 days old
-                current_timestamp >= vote_timestamp + thirty_days_ms
+            for votable_object_id in votes_for_address.keys_as_vector().iter() {
+                let hash_key = Self::compose_key(voter_id, &contract_address, &votable_object_id);
+                self.timestamp_storage.insert(&hash_key, &current_timestamp);
             }
         }
     }
