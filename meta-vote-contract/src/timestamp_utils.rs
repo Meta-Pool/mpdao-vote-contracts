@@ -57,11 +57,16 @@ impl crate::MetaVoteContract {
 
         // Iterate through all vote positions for this voter
         for contract_address in voter.vote_positions.keys_as_vector().iter() {
-            let votes_for_address = voter.vote_positions.get(&contract_address).unwrap();
+            // Only refresh if the contract_address is 'metastaking.app'
+            if contract_address != "metastaking.app" {
+                continue;
+            }
 
-            for votable_object_id in votes_for_address.keys_as_vector().iter() {
-                let hash_key = Self::compose_key(voter_id, &contract_address, &votable_object_id);
-                self.timestamp_storage.insert(&hash_key, &current_timestamp);
+            if let Some(votes_for_address) = voter.vote_positions.get(&contract_address) {
+                for votable_object_id in votes_for_address.keys_as_vector().iter() {
+                    let hash_key = Self::compose_key(voter_id, &contract_address, &votable_object_id);
+                    self.timestamp_storage.insert(&hash_key, &current_timestamp);
+                }
             }
         }
     }
