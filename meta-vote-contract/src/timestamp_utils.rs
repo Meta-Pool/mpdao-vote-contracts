@@ -70,4 +70,25 @@ impl crate::MetaVoteContract {
             }
         }
     }
+
+    /// Verify that a vote timestamp is either None or at least 30 days old
+    pub(crate) fn verify_vote_is_stale(
+        &self,
+        voter_id: &String,
+        contract_address: &ContractAddress,
+        votable_object_id: &VotableObjId,
+    ) -> bool {
+        let timestamp = self.get_vote_timestamp(voter_id, contract_address, votable_object_id);
+
+        match timestamp {
+            None => true, // No timestamp means it's from before timestamp tracking was implemented
+            Some(vote_timestamp) => {
+                let current_timestamp = env::block_timestamp_ms();
+                let sixty_days_ms = 60 * 24 * 60 * 60 * 1000; // 60 days in milliseconds
+
+                // Vote is stale if it's at least 60 days old
+                current_timestamp >= vote_timestamp + sixty_days_ms
+            }
+        }
+    }
 }
