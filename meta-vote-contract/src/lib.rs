@@ -735,7 +735,7 @@ impl MetaVoteContract {
         votable_object_id: VotableObjId,
     ) {
         self.assert_operator();
-        self.verify_vote_is_stale(voter_id, contract_address, votable_object_id);
+        self.verify_vote_is_stale(&voter_id, &contract_address, &votable_object_id);
         self.internal_unvote(&voter_id, &contract_address, &votable_object_id)
     }
 
@@ -749,12 +749,16 @@ impl MetaVoteContract {
         self.assert_operator();
 
         for (voter_id, contract_address, votable_object_id) in &list_to_remove {
-            self.remove_stale_vote(voter_id, contract_address, votable_object_id);
+            self.remove_stale_vote(
+                voter_id.to_string(),
+                contract_address.to_string(),
+                votable_object_id.to_string(),
+            );
         }
 
         log!(
             "Stale votes removed: Completed bulk of {} vote positions.",
-            purge_requests.len()
+            list_to_remove.len()
         );
     }
 
