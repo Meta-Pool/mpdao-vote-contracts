@@ -745,10 +745,10 @@ impl MetaVoteContract {
         self.refresh_all_vote_timestamps(&voter_id);
     }
 
-    pub fn remove_stale_votes_by_list(&mut self, purge_requests: Vec<(VoterId, ContractAddress, VotableObjId)>) {
+    pub fn remove_stale_votes_by_list(&mut self, list_to_remove: Vec<(VoterId, ContractAddress, VotableObjId)>) {
         self.assert_operator();
 
-        for (voter_id, contract_address, votable_object_id) in &purge_requests {
+        for (voter_id, contract_address, votable_object_id) in &list_to_remove {
             self.remove_stale_vote(voter_id, contract_address, votable_object_id);
         }
 
