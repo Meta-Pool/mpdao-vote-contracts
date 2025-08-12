@@ -727,45 +727,51 @@ impl MetaVoteContract {
         self.voters.insert(&voter_id, &voter);
     }
 
-    // operator bot can remove stale votes
-    pub fn remove_stale_vote(
-        &mut self,
-        voter_id: String,
-        contract_address: ContractAddress,
-        votable_object_id: VotableObjId,
-    ) {
-        self.assert_operator();
-
-        if self.verify_vote_is_stale(&voter_id, &contract_address, &votable_object_id) {
-            self.internal_unvote(&voter_id, &contract_address, &votable_object_id);
-        } else {
-            log!(
-                "⏩ Vote at '{}' for '{}' is not stale, skipping...",
-                contract_address,
-                votable_object_id
-            );
-        }
-    }
-
-    // If a vote doenst existe the transaction fails for all votes
+    // remove votes that are verified as stale
     pub fn remove_stale_votes_by_list(&mut self, list_to_remove: Vec<StaleVoteInput>) {
         self.assert_operator();
 
-        let count = list_to_remove.len(); // capture before consuming the vector
-
-        for vote in list_to_remove {
-            self.remove_stale_vote(vote.voter_id, vote.contract_address, vote.votable_object_id);
+        for r in list_to_remove {
+            if self.verify_vote_is_stale(&r.voter_id, &r.contract_address, &r.votable_object_id) {
+                self.internal_unvote(&r.voter_id, &r.contract_address, &r.votable_object_id);
+            } else {
+                log!(
+                    "WARN: Vote {} {} {} not stale, skipping...",
+                    &r.voter_id,
+                    &r.contract_address,
+                    &r.votable_object_id
+                );
+            }
         }
-
-        log!("Stale votes removed: Completed bulk of {} vote positions.", count);
     }
 
-    /// Refresh only the STALE votes owned by the caller.
-    /// Returns how many timestamps were updated.
-    pub fn refresh_vote_timestamps(&mut self) -> u32 {
-        let voter_id = env::predecessor_account_id().to_string();
-        self.refresh_only_stale_votes(&voter_id)
+    /// Refresh validator votes for a user
+    /// Returns how many votes were updated.
+    // refreshing costs 0.01 NEAR, call it with 0.01 NEAR attached
+    #[payable]
+    pub fn refresh_vote_timestamps(&mut self, voter_id: &AccountId) -> u16 {
+        // refreshing costs 0.01 NEAR
+        require!(env::attached_deposit() == NearToken::from_millinear(10));
+        let mut refreshed: u16 = 0;
+        // Check if the voter exists in the registry
+        if let Some(voter) = self.voters.get(&voter_id.to_string()) {
+            // Iterate through all vote positions for this voter
+            for contract_address in voter.vote_positions.keys_as_vector().iter() {
+                // Only refresh if the vote is for validators (contract_address is 'metastaking.app')
+                if contract_address == "metastaking.app" {
+                    if let Some(votes_for_address) = voter.vote_positions.get(&contract_address) {
+                        // Iterate each votable object ID
+                        for votable_object_id in votes_for_address.keys_as_vector().iter() {
+                            self.store_vote_timestamp(&voter_id.to_string(), &contract_address, &votable_object_id);
+                            refreshed += 1;
+                        }
+                    }
+                }
+            }
+        }
+        refreshed
     }
+
     // *********
     // * Admin *
     // *********

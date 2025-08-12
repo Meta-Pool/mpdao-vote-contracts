@@ -19,7 +19,7 @@
 				"$rust-panic"
 			],
 			"group": "build",
-			"label": "build WASM contracts"
+			"label": "check-compile contracts"
 		},
 		{
 			"type": "cargo",

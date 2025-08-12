@@ -34,7 +34,7 @@ pub struct VotableObjectJSON {
     pub votable_contract: String,
     pub id: VotableObjId,
     pub current_votes: U128,
-    pub vote_timestamp: Option<u64>,
+    pub vote_timestamp: u64,
 }
 
 #[derive(Debug)]

@@ -235,7 +235,7 @@ impl MetaVoteContract {
                 votable_contract: contract_address.to_string(),
                 id,
                 current_votes: applied_voting_power.into(),
-                vote_timestamp: None, // No specific voter context, so no timestamp
+                vote_timestamp: 0, // no specific user, send zero
             })
         }
         results.sort_by_key(|v| v.current_votes.0);
