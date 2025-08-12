@@ -44,3 +44,19 @@ pub struct VotePositionJSON {
     pub votable_object_id: String,
     pub voting_power: U128,
 }
+
+/// Represents a single vote position to be removed as stale, used in batch operations.
+///
+/// We use a named struct instead of raw tuples because NEAR's JSON ABI does not reliably
+/// support deserialization of tuples from external JSON callers (e.g., NEAR CLI, NEAR Blocks).
+///
+/// This struct enables clear, unambiguous argument passing and full compatibility with
+/// frontend tools and JSON-based inputs. It also allows consuming the input by value
+/// without requiring `.clone()`, keeping the batch removal process efficient.
+#[derive(Debug)]
+#[near(serializers = [json])]
+pub struct StaleVoteInput {
+    pub voter_id: VoterId,
+    pub contract_address: ContractAddress,
+    pub votable_object_id: VotableObjId,
+}

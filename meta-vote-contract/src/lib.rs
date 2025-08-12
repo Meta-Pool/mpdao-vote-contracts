@@ -735,33 +735,37 @@ impl MetaVoteContract {
         votable_object_id: VotableObjId,
     ) {
         self.assert_operator();
-        self.verify_vote_is_stale(&voter_id, &contract_address, &votable_object_id);
-        self.internal_unvote(&voter_id, &contract_address, &votable_object_id)
-    }
 
-    /// Refresh the timestamps of all votes for the calling user
-    pub fn refresh_vote_timestamps(&mut self) {
-        let voter_id = env::predecessor_account_id().to_string();
-        self.refresh_all_vote_timestamps(&voter_id);
-    }
-
-    pub fn remove_stale_votes_by_list(&mut self, list_to_remove: Vec<(VoterId, ContractAddress, VotableObjId)>) {
-        self.assert_operator();
-
-        for (voter_id, contract_address, votable_object_id) in &list_to_remove {
-            self.remove_stale_vote(
-                voter_id.to_string(),
-                contract_address.to_string(),
-                votable_object_id.to_string(),
+        if self.verify_vote_is_stale(&voter_id, &contract_address, &votable_object_id) {
+            self.internal_unvote(&voter_id, &contract_address, &votable_object_id);
+        } else {
+            log!(
+                "⏩ Vote at '{}' for '{}' is not stale, skipping...",
+                contract_address,
+                votable_object_id
             );
         }
-
-        log!(
-            "Stale votes removed: Completed bulk of {} vote positions.",
-            list_to_remove.len()
-        );
     }
 
+    // If a vote doenst existe the transaction fails for all votes
+    pub fn remove_stale_votes_by_list(&mut self, list_to_remove: Vec<StaleVoteInput>) {
+        self.assert_operator();
+
+        let count = list_to_remove.len(); // capture before consuming the vector
+
+        for vote in list_to_remove {
+            self.remove_stale_vote(vote.voter_id, vote.contract_address, vote.votable_object_id);
+        }
+
+        log!("Stale votes removed: Completed bulk of {} vote positions.", count);
+    }
+
+    /// Refresh only the STALE votes owned by the caller.
+    /// Returns how many timestamps were updated.
+    pub fn refresh_vote_timestamps(&mut self) -> u32 {
+        let voter_id = env::predecessor_account_id().to_string();
+        self.refresh_only_stale_votes(&voter_id)
+    }
     // *********
     // * Admin *
     // *********
