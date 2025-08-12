@@ -116,6 +116,12 @@ impl MetaVoteContract {
             self.min_unbond_period,
             self.max_unbond_period
         );
+        assert!(
+            voter.balance >= mpdao_amount,
+            "Not enough voter.balance {}",
+            voter.balance
+        );
+        voter.balance -= mpdao_amount;
 
         match voter.find_locked_position(unbond_days) {
             Some(index) => {

@@ -29,6 +29,7 @@ impl MetaVoteContract {
         );
 
         voter.balance -= total_to_withdraw;
+        self.total_mpdao_deposited -= total_to_withdraw;
 
         if voter.is_empty() {
             self.voters.remove(&voter_id);
@@ -99,6 +100,7 @@ impl MetaVoteContract {
         let mut voter = self.internal_get_voter(&voter_id);
         voter.balance += amount;
         self.voters.insert(&voter_id, &voter);
+        self.total_mpdao_deposited += amount;
     }
 
     /// This transfer is only to claim available stNEAR

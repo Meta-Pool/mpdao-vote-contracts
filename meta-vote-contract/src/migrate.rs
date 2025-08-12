@@ -54,6 +54,18 @@ impl MetaVoteContract {
     pub fn migrate() -> Self {
         // retrieve the current state from the contract
         let old: OldState = env::state_read().expect("failed");
+
+        // Calculate total mpDAO locked from all voters' locking positions
+        let mut total_mpdao_deposited = 0u128;
+        for voter_id in old.voters.keys_as_vector().iter() {
+            if let Some(voter) = old.voters.get(&voter_id) {
+                total_mpdao_deposited += voter.balance;
+                for position in voter.locking_positions.iter() {
+                    total_mpdao_deposited += position.amount;
+                }
+            }
+        }
+
         // return the new state
         Self {
             owner_id: old.owner_id,
@@ -99,6 +111,7 @@ impl MetaVoteContract {
 
             // timestamp storage with hashed keys - new field, initialize empty
             timestamp_storage: UnorderedMap::new(StorageKey::TimestampStorage),
+            total_mpdao_deposited,
         }
     }
 }

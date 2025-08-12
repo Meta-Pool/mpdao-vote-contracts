@@ -73,6 +73,7 @@ pub struct MetaVoteContract {
 
     // timestamp storage with hashed keys
     pub timestamp_storage: UnorderedMap<CryptoHash, u64>,
+    pub total_mpdao_deposited: u128,
 }
 
 #[near]
@@ -128,6 +129,7 @@ impl MetaVoteContract {
             mpdao_avail_to_sell: 0,
             min_claim_and_bond_days: min_unbond_period,
             timestamp_storage: UnorderedMap::new(StorageKey::TimestampStorage),
+            total_mpdao_deposited: 0,
         }
     }
 
@@ -358,20 +360,12 @@ impl MetaVoteContract {
     // ***********
     // * Re-Lock *
     // ***********
-
-    pub fn relock_position(&mut self, index: PositionIndex, locking_period: Days, amount_from_balance: U128) {
+    // removed amount_from_balance. TODO:check it is not used in the frontend
+    pub fn relock_position(&mut self, index: PositionIndex, locking_period: Days) {
         let voter_id = env::predecessor_account_id().as_str().to_string();
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let locking_position = voter.get_position(index);
 
-        // Check voter balance and unlocking position amount.
-        let amount_from_balance = amount_from_balance.0;
-        assert!(
-            voter.balance >= amount_from_balance,
-            "Not enough balance. You have {} mpDAO in balance, required {}.",
-            voter.balance,
-            amount_from_balance
-        );
         // Check if position is unlocking.
         require!(
             locking_position.unlocking_started_at.is_some(),
@@ -392,76 +386,61 @@ impl MetaVoteContract {
         }
 
         log!("RELOCK: {} relocked position {}.", &voter_id.to_string(), index);
-        let amount = locking_position.amount + amount_from_balance;
+
         voter.remove_position(index);
-        voter.balance -= amount_from_balance;
-        self.deposit_locking_position(amount, locking_period, &voter_id, &mut voter);
+        // a new locked position will be created or the amount will be added to an existing one
+        self.deposit_locking_position(locking_position.amount, locking_period, &voter_id, &mut voter);
     }
 
-    pub fn relock_partial_position(
-        &mut self,
-        index: PositionIndex,
-        amount_from_position: U128,
-        locking_period: Days,
-        amount_from_balance: U128,
-    ) {
+    // removed amount_from_balance. TODO:check it is not used in the frontend
+    pub fn relock_partial_position(&mut self, index: PositionIndex, amount_from_position: U128, locking_period: Days) {
         let voter_id = env::predecessor_account_id().as_str().to_string();
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let mut locking_position = voter.get_position(index);
 
-        // Check voter balance and unlocking position amount.
-        let amount_from_balance = amount_from_balance.0;
-        let amount_from_position = amount_from_position.0;
-        assert!(
-            voter.balance >= amount_from_balance,
-            "Not enough balance. You have {} mpDAO in balance, required {}.",
-            voter.balance,
-            amount_from_balance
-        );
-        assert!(
-            locking_position.amount >= amount_from_position,
-            "Locking position amount is not enough. Locking position has {} mpDAO, required {}.",
-            locking_position.amount,
-            amount_from_position
-        );
-        let amount = amount_from_balance + amount_from_position;
-        assert!(
-            amount >= self.min_deposit_amount,
-            "A locking position cannot have less than {} mpDAO.",
-            self.min_deposit_amount
-        );
         // Check if position is unlocking.
         require!(
             locking_position.unlocking_started_at.is_some(),
             "Cannot re-lock a locked position."
         );
 
+        // Check unlocking position amount.
+        let amount_from_position = amount_from_position.0;
+        assert!(
+            locking_position.amount >= amount_from_position,
+            "Locking position amount is not enough. Locking position has {} mpDAO, required {}.",
+            locking_position.amount,
+            amount_from_position
+        );
+        // check how much is left
+        let new_amount = locking_position.amount - amount_from_position;
+        assert!(
+            new_amount >= self.min_deposit_amount,
+            "A locking position cannot have less than {} mpDAO.",
+            self.min_deposit_amount
+        );
+        require!(new_amount > 0, "Not partial. Use relock_position() function instead.");
+
         let now = get_current_epoch_millis();
         let unlocking_date = locking_position.unlocking_started_at.unwrap() + locking_position.locking_period_millis();
-
         if now < unlocking_date {
             // Position is **unlocking**.
-            let remaining = unlocking_date - now;
+            let remaining_ms = unlocking_date - now;
             assert!(
-                remaining < days_to_millis(locking_period),
+                remaining_ms < days_to_millis(locking_period),
                 "The new locking period should be greater than {} days.",
-                millis_to_days(remaining)
+                millis_to_days(remaining_ms)
             );
 
-            let new_amount = locking_position.amount - amount_from_position;
-            assert!(
-                amount >= self.min_deposit_amount,
-                "A locking position cannot have less than {} mpDAO.",
-                self.min_deposit_amount
-            );
-            require!(new_amount > 0, "Use relock_position() function instead.");
-
-            locking_position.amount = new_amount;
+            locking_position.amount -= amount_from_position;
+            voter.balance += amount_from_position; // add to balance, will be relocked shortly
             locking_position.voting_power = utils::calculate_voting_power(new_amount, locking_position.locking_period);
             voter.locking_positions.replace(index, locking_position);
         } else {
-            voter.balance += locking_position.amount - amount_from_position;
-            voter.remove_position(index);
+            // Position is fully unlocked
+            // to simplify, use either the full relock
+            // or the user should withdraw the mpDAO and relock any amount later
+            panic!("Cannot partially relock a fully unlocked position. Use relock_position() instead.");
         }
 
         log!(
@@ -469,31 +448,32 @@ impl MetaVoteContract {
             &voter_id.to_string(),
             index
         );
-        voter.balance -= amount_from_balance;
-        self.deposit_locking_position(amount, locking_period, &voter_id, &mut voter);
+        // a new locked position will be created
+        self.deposit_locking_position(amount_from_position, locking_period, &voter_id, &mut voter);
     }
 
-    pub fn relock_from_balance(&mut self, locking_period: Days, amount_from_balance: U128) {
-        let voter_id = env::predecessor_account_id().as_str().to_string();
-        let mut voter = self.internal_get_voter_or_panic(&voter_id);
+    // DEPRECATED -- TODO: check is not used in the frontend
+    // pub fn relock_from_balance(&mut self, locking_period: Days, amount_from_balance: U128) {
+    //     let voter_id = env::predecessor_account_id().as_str().to_string();
+    //     let mut voter = self.internal_get_voter_or_panic(&voter_id);
 
-        let amount = amount_from_balance.0;
-        assert!(
-            voter.balance >= amount,
-            "Not enough balance. You have {} mpDAO in balance, required {}.",
-            voter.balance,
-            amount
-        );
-        assert!(
-            amount >= self.min_deposit_amount,
-            "A locking position cannot have less than {} mpDAO.",
-            self.min_deposit_amount
-        );
+    //     let amount = amount_from_balance.0;
+    //     assert!(
+    //         voter.balance >= amount,
+    //         "Not enough balance. You have {} mpDAO in balance, required {}.",
+    //         voter.balance,
+    //         amount
+    //     );
+    //     assert!(
+    //         amount >= self.min_deposit_amount,
+    //         "A locking position cannot have less than {} mpDAO.",
+    //         self.min_deposit_amount
+    //     );
 
-        log!("RELOCK: {} relocked position.", &voter_id.to_string());
-        voter.balance -= amount;
-        self.deposit_locking_position(amount, locking_period, &voter_id, &mut voter);
-    }
+    //     log!("RELOCK: {} relocked position.", &voter_id.to_string());
+    //     voter.balance -= amount;
+    //     self.deposit_locking_position(amount, locking_period, &voter_id, &mut voter);
+    // }
 
     // ******************
     // * Clear Position *

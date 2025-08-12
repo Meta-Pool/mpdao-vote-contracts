@@ -17,6 +17,7 @@ pub struct ContractInfoJson {
     pub max_locking_positions: u8,
     pub max_voting_positions: u8,
     pub mpdao_token_contract_address: String,
+    pub total_voting_power: U128,
     pub stnear_token_contract_address: String,
     pub registration_cost: U128,
     pub prev_governance_contract: String,
@@ -27,6 +28,7 @@ pub struct ContractInfoJson {
     pub evm_delegates_count: u64,
     pub mpdao_per_near_e24: U128,
     pub mpdao_avail_to_sell: U128,
+    pub total_mpdao_deposited: U128,
 }
 
 #[near]
@@ -50,6 +52,7 @@ impl MetaVoteContract {
             max_locking_positions: self.max_locking_positions,
             max_voting_positions: self.max_voting_positions,
             mpdao_token_contract_address: self.mpdao_token_contract_address.as_str().into(),
+            total_voting_power: self.total_voting_power.into(),
             stnear_token_contract_address: self.stnear_token_contract_address.as_str().into(),
             registration_cost: self.registration_cost.into(),
             prev_governance_contract: self.prev_governance_contract.as_str().into(),
@@ -60,6 +63,7 @@ impl MetaVoteContract {
             evm_delegates_count: self.evm_delegates.len(),
             mpdao_per_near_e24: self.mpdao_per_near_e24.into(),
             mpdao_avail_to_sell: self.mpdao_avail_to_sell.into(),
+            total_mpdao_deposited: self.total_mpdao_deposited.into(),
         }
     }
 

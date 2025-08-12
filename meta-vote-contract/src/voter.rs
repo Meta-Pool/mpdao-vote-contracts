@@ -98,7 +98,8 @@ impl Voter {
     }
 
     pub(crate) fn remove_position(&mut self, index: PositionIndex) {
-        self.locking_positions.swap_remove(index);
+        let position = self.locking_positions.swap_remove(index);
+        self.balance += position.amount;
     }
 
     pub(crate) fn get_vote_position_for_address(
@@ -164,7 +165,6 @@ impl Voter {
             let locking_position = self.get_position(index);
             // only if it is fully unlocked
             if locking_position.is_unlocked() {
-                self.balance += locking_position.amount;
                 self.remove_position(index);
             }
         }

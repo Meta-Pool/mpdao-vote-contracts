@@ -54,6 +54,8 @@ impl FungibleTokenReceiver for MetaVoteContract {
             self.assert_min_deposit_amount(amount);
             log!("DEPOSIT: {} mpDAO deposited from {}", amount, &voter_id,);
             let mut voter = self.internal_get_voter(&voter_id);
+            voter.balance += amount;
+            self.total_mpdao_deposited += amount;
             self.deposit_locking_position(amount, days, &voter_id, &mut voter);
         }
         // Return unused amount
@@ -81,6 +83,7 @@ impl MetaVoteContract {
                 total_distributed += amount;
             }
             self.accumulated_mpdao_distributed_for_claims += total_distributed;
+            self.total_mpdao_deposited += total_distributed;
 
         // stNear Token
         } else if token_address == self.stnear_token_contract_address {
