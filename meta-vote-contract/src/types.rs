@@ -43,6 +43,7 @@ pub struct VotePositionJSON {
     pub votable_address: String,
     pub votable_object_id: String,
     pub voting_power: U128,
+    pub vote_timestamp: u64,
 }
 
 /// Represents a single vote position to be removed as stale, used in batch operations.

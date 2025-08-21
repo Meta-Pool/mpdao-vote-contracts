@@ -75,7 +75,7 @@ impl MetaVoteContract {
     // get all information for a single voter: voter + locking-positions + voting-positions
     pub fn get_voter_info(&self, voter_id: &String) -> VoterJSON {
         if let Some(voter) = self.voters.get(voter_id) {
-            voter.to_json(voter_id)
+            voter.to_json(voter_id, self)
         } else {
             VoterJSON {
                 voter_id: voter_id.to_string(),
@@ -98,7 +98,7 @@ impl MetaVoteContract {
         for index in start..std::cmp::min(start + limit, voters_len) {
             let voter_id = keys.get(index).unwrap();
             let voter = self.voters.get(&voter_id).unwrap();
-            results.push(voter.to_json(&voter_id));
+            results.push(voter.to_json(&voter_id, self));
         }
         results
     }

@@ -5,7 +5,7 @@ pub struct VoterJSON {
     pub voter_id: String,
     pub balance_in_contract: U128,
     pub locking_positions: Vec<LockingPositionJSON>, // sum here to get total voting power
-    pub voting_power: U128,                    // available voting power
+    pub voting_power: U128,                          // available voting power
     pub vote_positions: Vec<VotePositionJSON>,       // sum here to get used voting power
 }
 #[derive(Debug)]
@@ -126,7 +126,7 @@ impl Voter {
         result
     }
 
-    pub(crate) fn to_json(&self, voter_id: &VoterId) -> VoterJSON {
+    pub(crate) fn to_json(&self, voter_id: &VoterId, main: &MetaVoteContract) -> VoterJSON {
         let mut locking_positions = Vec::<LockingPositionJSON>::new();
         for index in 0..self.locking_positions.len() {
             let pos = self.locking_positions.get(index).unwrap();
@@ -138,10 +138,12 @@ impl Voter {
             let pos = self.vote_positions.get(&address).unwrap();
             for obj in pos.keys_as_vector().iter() {
                 let value = pos.get(&obj).unwrap();
+                let vote_timestamp = main.get_vote_timestamp(voter_id, &address, &obj);
                 vote_positions.push(VotePositionJSON {
                     votable_address: address.as_str().to_string(),
                     votable_object_id: obj,
                     voting_power: value.into(),
+                    vote_timestamp,
                 });
             }
         }
