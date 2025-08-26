@@ -93,6 +93,8 @@ impl MetaVoteContract {
             mpdao_avail_to_sell: old.mpdao_avail_to_sell,
 
             min_claim_and_bond_days: old.max_unbond_period / 2,
+
+            timestamp_storage: UnorderedMap::new(StorageKey::TimestampStorage),
         }
     }
 }

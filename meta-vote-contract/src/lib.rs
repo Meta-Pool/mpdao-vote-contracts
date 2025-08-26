@@ -5,7 +5,7 @@ use near_sdk::{
     collections::{unordered_map::UnorderedMap, Vector},
     env, log, near_bindgen, require,
     store::LookupMap,
-    AccountId, Balance, PanicOnDefault, Promise, ONE_NEAR,
+    AccountId, Balance, CryptoHash, PanicOnDefault, Promise, ONE_NEAR,
 };
 use types::*;
 use voter::Voter;
@@ -69,6 +69,9 @@ pub struct MetaVoteContract {
 
     // added 2025-03-28
     pub min_claim_and_bond_days: u16,
+
+    // timestamp storage with hashed keys
+    pub timestamp_storage: UnorderedMap<CryptoHash, u64>,
 }
 
 #[near_bindgen]
@@ -123,6 +126,7 @@ impl MetaVoteContract {
             mpdao_per_near_e24: 0,
             mpdao_avail_to_sell: 0,
             min_claim_and_bond_days: min_unbond_period,
+            timestamp_storage: UnorderedMap::new(StorageKey::TimestampStorage),
         }
     }
 
