@@ -13,7 +13,7 @@
 		},
 		{
 			"type": "shell",
-			"command": "bash scripts/build.sh",
+			"command": "bash scripts/compile.sh",
 			"problemMatcher": [
 				"$rustc",
 				"$rust-panic"
