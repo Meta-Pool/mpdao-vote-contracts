@@ -3,11 +3,11 @@ echo =========================================================
 rustc_version=$(rustc --version | awk '{print $2}')
 echo RUST version:  $rustc_version
 echo =========================================================
-echo WARN: If rustc version is 1.82 or 1.83 after deploy you will get Deserialization ERROR!!!
+echo WARN: If rustc version is 1.82 or higher, after deploy you will get Deserialization ERROR!!!
 echo WARN: The error is "wasm execution failed with error: CompilationError(PrepareError(Deserialization))"
 echo =========================================================
-BAD_VERSION="1.82"
-if [[ $(echo -e "$rustc_version\n$BAD_VERSION" | sort -V | head -n1) == "$BAD_VERSION" ]]; then
+GOOD_VERSION="1.81"
+if [[ $(echo -e "$rustc_version\n$GOOD_VERSION" | sort -V | head -n1) != "$GOOD_VERSION" ]]; then
     exit 1
 fi
 cargo build -p meta-vote-contract --target wasm32-unknown-unknown --release
