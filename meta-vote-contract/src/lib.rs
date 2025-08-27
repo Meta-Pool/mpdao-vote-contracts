@@ -71,7 +71,7 @@ pub struct MetaVoteContract {
     // added 2025-03-28
     pub min_claim_and_bond_days: u16,
 
-    // timestamp storage with hashed keys
+    // timestamp storage with hashed keys -- added 2025-08-26
     pub timestamp_storage: UnorderedMap<CryptoHash, u64>,
 }
 

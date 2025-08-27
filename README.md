@@ -4,6 +4,13 @@
 
 Implementation of a general voting system for metapool.app DAO using the mpDAO token.
 
+## Compiling
+
+**IMPORTANT** Use rustc 1.81 for deploying contracts. There's a problem that only manifests after deploying.
+
+Use newer rustc versions (stable) for testing.
+
+
 ## Versions
 
 The last version of the deployed contract, in Near `mainnet`, is in the `main` branch.
