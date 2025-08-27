@@ -4,7 +4,7 @@ members = [
     "kv-store-contract",
     "mpip-contract",
     "test-meta-token",
-#    "near-workspaces-integration-test"
+    #    "near-workspaces-integration-test"
 ]
 resolver = "2"
 
