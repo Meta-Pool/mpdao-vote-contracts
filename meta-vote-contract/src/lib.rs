@@ -797,7 +797,10 @@ impl MetaVoteContract {
     #[payable]
     pub fn refresh_vote_timestamps(&mut self, voter_id: &AccountId) -> u16 {
         // refreshing costs 0.01 NEAR
-        require!(env::attached_deposit() == ONE_NEAR / 1000);
+        require!(
+            env::attached_deposit() == ONE_NEAR / 100,
+            "Attach exactly 0.01 NEAR to refresh votes timestamps."
+        );
         let mut refreshed: u16 = 0;
         // Check if the voter exists in the registry
         if let Some(voter) = self.voters.get(&voter_id.to_string()) {
