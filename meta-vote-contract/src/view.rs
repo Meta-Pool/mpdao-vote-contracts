@@ -85,7 +85,7 @@ impl MetaVoteContract {
     // get all information for a single voter: voter + locking-positions + voting-positions
     pub fn get_voter_info(&self, voter_id: &String) -> VoterJSON {
         if let Some(voter) = self.voters.get(voter_id) {
-            voter.to_json(voter_id)
+            voter.to_json(voter_id, self)
         } else {
             VoterJSON {
                 voter_id: voter_id.to_string(),
@@ -108,7 +108,7 @@ impl MetaVoteContract {
         for index in start..std::cmp::min(start + limit, voters_len) {
             let voter_id = keys.get(index).unwrap();
             let voter = self.voters.get(&voter_id).unwrap();
-            results.push(voter.to_json(&voter_id));
+            results.push(voter.to_json(&voter_id, self));
         }
         results
     }
@@ -265,6 +265,7 @@ impl MetaVoteContract {
                 votable_contract: contract_address.to_string(),
                 id,
                 current_votes: applied_voting_power.into(),
+                vote_timestamp: 0, // no specific user, send zero
             })
         }
         results.sort_by_key(|v| v.current_votes.0);
@@ -277,10 +278,12 @@ impl MetaVoteContract {
         for contract_address in voter.vote_positions.keys_as_vector().iter() {
             let votes_for_address = voter.vote_positions.get(&contract_address).unwrap();
             for (id, applied_voting_power) in votes_for_address.iter() {
+                let timestamp = self.get_vote_timestamp(&voter_id, &contract_address, &id);
                 results.push(VotableObjectJSON {
                     votable_contract: contract_address.to_string(),
                     id,
                     current_votes: applied_voting_power.into(),
+                    vote_timestamp: timestamp,
                 })
             }
         }
