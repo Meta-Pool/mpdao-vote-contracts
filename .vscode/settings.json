@@ -16,6 +16,7 @@
         "Manzanal",
         "maplit",
         "metapool",
+        "metastaking",
         "METATOKEN",
         "metavote",
         "millinear",
@@ -43,13 +44,14 @@
         "unbonding",
         "unvote",
         "unvoted",
+        "unvoting",
         "yocto",
         "yoctonear",
         "yoctos",
         "ytof",
         "yton"
-    ]
-    ,"cSpell.ignorePaths": [
+    ],
+    "cSpell.ignorePaths": [
         "package-lock.json",
         "node_modules",
         "vscode-extension",
@@ -57,6 +59,7 @@
         ".vscode",
         ".vscode-insiders",
         "**/.cargo/**",
-        "Cargo.toml"
+        "Cargo.toml",
+        "scripts/build.sh"
     ]
 }

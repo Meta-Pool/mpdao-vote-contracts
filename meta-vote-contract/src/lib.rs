@@ -5,7 +5,7 @@ use near_sdk::{
     collections::{unordered_map::UnorderedMap, Vector},
     env, log, near_bindgen, require,
     store::LookupMap,
-    AccountId, Balance, PanicOnDefault, Promise, ONE_NEAR,
+    AccountId, Balance, CryptoHash, PanicOnDefault, Promise, ONE_NEAR,
 };
 use types::*;
 use voter::Voter;
@@ -17,6 +17,7 @@ mod interface;
 mod internal;
 mod locking_position;
 mod migrate;
+mod timestamp_utils;
 mod types;
 mod utils;
 mod view;
@@ -69,6 +70,9 @@ pub struct MetaVoteContract {
 
     // added 2025-03-28
     pub min_claim_and_bond_days: u16,
+
+    // timestamp storage with hashed keys - added 2025-08-26
+    pub timestamp_storage: UnorderedMap<CryptoHash, u64>,
 }
 
 #[near_bindgen]
@@ -123,6 +127,7 @@ impl MetaVoteContract {
             mpdao_per_near_e24: 0,
             mpdao_avail_to_sell: 0,
             min_claim_and_bond_days: min_unbond_period,
+            timestamp_storage: UnorderedMap::new(StorageKey::TimestampStorage),
         }
     }
 
@@ -600,6 +605,8 @@ impl MetaVoteContract {
             .vote_positions
             .insert(&contract_address, &votes_for_address);
 
+        // Store timestamp for this vote
+        self.store_vote_timestamp(voter_id, contract_address, votable_object_id);
         // Update Meta Vote state.
         self.internal_increase_total_votes(voting_power, &contract_address, &votable_object_id);
     }
@@ -640,6 +647,9 @@ impl MetaVoteContract {
             voter.available_voting_power -= additional_votes;
             votes += additional_votes;
 
+            // Update timestamp for modified vote
+            self.store_vote_timestamp(&voter_id, &contract_address, &votable_object_id);
+
             log!(
                 "VOTE: {} increased to {} votes for object {} at address {}.",
                 &voter_id,
@@ -658,6 +668,9 @@ impl MetaVoteContract {
             let remove_votes = votes - voting_power;
             voter.available_voting_power += remove_votes;
             votes -= remove_votes;
+
+            // Update timestamp for modified vote
+            self.store_vote_timestamp(&voter_id, &contract_address, &votable_object_id);
 
             log!(
                 "VOTE: {} decreased to {} votes for object {} at address {}.",
@@ -704,6 +717,10 @@ impl MetaVoteContract {
                 .vote_positions
                 .insert(&contract_address, &user_votes_for_app);
         }
+
+        // Remove timestamp for this vote
+        self.remove_vote_timestamp(voter_id, contract_address, votable_object_id);
+
         // Update Meta Vote global state unordered maps
         self.state_internal_decrease_total_votes_for_address(
             user_vote_for_object,
@@ -754,6 +771,58 @@ impl MetaVoteContract {
         );
         // save voter
         self.voters.insert(&voter_id, &voter);
+    }
+
+    // remove votes that are verified as stale
+    pub fn remove_stale_votes_by_list(&mut self, list_to_remove: Vec<StaleVoteInput>) {
+        self.assert_operator();
+
+        for r in list_to_remove {
+            if self.verify_vote_is_stale(&r.voter_id, &r.contract_address, &r.votable_object_id) {
+                self.internal_unvote(&r.voter_id, &r.contract_address, &r.votable_object_id);
+            } else {
+                log!(
+                    "WARN: Vote {} {} {} not stale, skipping...",
+                    &r.voter_id,
+                    &r.contract_address,
+                    &r.votable_object_id
+                );
+            }
+        }
+    }
+
+    /// Refresh validator votes for a user
+    /// Returns how many votes were updated.
+    // refreshing costs 0.01 NEAR, call it with 0.01 NEAR attached
+    #[payable]
+    pub fn refresh_vote_timestamps(&mut self, voter_id: &AccountId) -> u16 {
+        // refreshing costs 0.01 NEAR
+        require!(
+            env::attached_deposit() == ONE_NEAR / 100,
+            "Attach exactly 0.01 NEAR to refresh votes timestamps."
+        );
+        let mut refreshed: u16 = 0;
+        // Check if the voter exists in the registry
+        if let Some(voter) = self.voters.get(&voter_id.to_string()) {
+            // Iterate through all vote positions for this voter
+            for contract_address in voter.vote_positions.keys_as_vector().iter() {
+                // Only refresh if the vote is for validators (contract_address is 'metastaking.app')
+                if contract_address == "metastaking.app" {
+                    if let Some(votes_for_address) = voter.vote_positions.get(&contract_address) {
+                        // Iterate each votable object ID
+                        for votable_object_id in votes_for_address.keys_as_vector().iter() {
+                            self.store_vote_timestamp(
+                                &voter_id.to_string(),
+                                &contract_address,
+                                &votable_object_id,
+                            );
+                            refreshed += 1;
+                        }
+                    }
+                }
+            }
+        }
+        refreshed
     }
 
     // *********

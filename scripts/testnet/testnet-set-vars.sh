@@ -2,9 +2,7 @@
 set -e
 export NEAR_ENV="testnet"
 
-BASE_METAVOTE_ADDRESS=mpdao-vote.testnet
-METAVOTE_VERSION=v1
-METAVOTE_CONTRACT_ADDRESS=$METAVOTE_VERSION.$BASE_METAVOTE_ADDRESS
+METAVOTE_CONTRACT_ADDRESS=v1.mpdao-vote.testnet
 METAVOTE_WASM="res/meta_vote_contract.wasm"
 OLD_METAVOTE_CONTRACT=metavote.testnet
 
@@ -18,7 +16,7 @@ MPIP_WASM="res/mpip_contract.wasm"
 
 # 1st Deploy Contract & init
 OWNER_ID=$METAVOTE_CONTRACT_ADDRESS
-OPERATOR_ID=$BASE_METAVOTE_ADDRESS
+OPERATOR_ID=mpdao-vote.testnet
 MPDAO_TOKEN_ADDRESS="mpdao-token.testnet"
 STNEAR_TESTNET_TOKEN_ADDRESS="meta-v2.pool.testnet"
         # owner_id: AccountId,

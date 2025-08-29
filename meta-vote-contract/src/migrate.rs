@@ -42,6 +42,12 @@ pub struct OldState {
 
     pub mpdao_per_near_e24: u128,
     pub mpdao_avail_to_sell: u128,
+
+    // added 2025-03-28
+    pub min_claim_and_bond_days: u16,
+
+    // timestamp storage with hashed keys - added 2025-08-26
+    pub timestamp_storage: UnorderedMap<CryptoHash, u64>,
 }
 
 #[near_bindgen]
@@ -92,7 +98,9 @@ impl MetaVoteContract {
             mpdao_per_near_e24: old.mpdao_per_near_e24,
             mpdao_avail_to_sell: old.mpdao_avail_to_sell,
 
-            min_claim_and_bond_days: old.max_unbond_period / 2,
+            min_claim_and_bond_days: old.min_claim_and_bond_days,
+
+            timestamp_storage: old.timestamp_storage,
         }
     }
 }
