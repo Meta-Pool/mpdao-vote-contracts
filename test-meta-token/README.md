@@ -1,0 +1,1 @@
+This contract is a basic NEP-141 and it is compiled so we have a NEP-141 contract wasm to be used in the integration tests. See repo https://github.com/Meta-Pool/mpdao-vote-contracts-integration-test

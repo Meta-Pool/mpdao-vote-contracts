@@ -19,8 +19,9 @@ use near_contract_standards::fungible_token::events::{self, FtBurn};
 use near_contract_standards::fungible_token::metadata::{
     FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
+use near_contract_standards::fungible_token::FungibleToken;
 use near_contract_standards::fungible_token::{
-    FungibleToken, FungibleTokenCore, FungibleTokenResolver,
+    core::FungibleTokenCore, resolver::FungibleTokenResolver,
 };
 use near_contract_standards::storage_management::{
     StorageBalance, StorageBalanceBounds, StorageManagement,
@@ -30,13 +31,12 @@ use near_sdk::collections::LazyOption;
 use near_sdk::env::predecessor_account_id;
 use near_sdk::json_types::U128;
 use near_sdk::{
-    assert_one_yocto, env, log, near_bindgen, require, AccountId, BorshStorageKey, NearToken,
-    PanicOnDefault, PromiseOrValue,
+    assert_one_yocto, env, log, near_bindgen, require, AccountId, BorshStorageKey, PanicOnDefault,
+    PromiseOrValue,
 };
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
-#[borsh(crate = "near_sdk::borsh")]
 pub struct Contract {
     token: FungibleToken,
     metadata: LazyOption<FungibleTokenMetadata>,
@@ -46,8 +46,7 @@ pub struct Contract {
 
 const DATA_IMAGE_SVG_ICON: &str = r#"data:image/svg+xml,%3csvg width='96' height='96' viewBox='0 0 96 96' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='96' height='96' rx='48' fill='white'/%3e%3cpath d='M29.2241 28.7456C28.396 27.9423 27.0094 28.5289 27.0091 29.6825L27 66.6773C26.9997 67.8501 28.4257 68.4286 29.2426 67.5872L48.6529 47.5943L29.2241 28.7456Z' fill='%23231B51'/%3e%3cpath d='M66.7759 28.7456C67.604 27.9423 68.9906 28.5289 68.9909 29.6825L69 66.6773C69.0003 67.8501 67.5743 68.4286 66.7574 67.5872L47.3471 47.5943L66.7759 28.7456Z' fill='%23231B51'/%3e%3c/svg%3e"#;
 
-#[derive(BorshSerialize, BorshStorageKey)]
-#[borsh(crate = "near_sdk::borsh")]
+#[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)]
 enum StorageKey {
     FungibleToken,
     Metadata,

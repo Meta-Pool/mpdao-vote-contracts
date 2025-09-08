@@ -5,14 +5,16 @@ edition = "2018"
 authors = ["metapool.app <hello@metapoool.app>"]
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [dependencies]
-near-sdk = "5.0.0"
-near-contract-standards = "5.0.0"
+near-sdk = "4.0.0"
+near-contract-standards = "4.0.0"
+uint = "0.9.3"
+
 
 [profile.release]
-codegen-units=1
+codegen-units = 1
 opt-level = "z"
 lto = true
 debug = false

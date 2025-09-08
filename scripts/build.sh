@@ -5,7 +5,8 @@ rustc_version=$(rustc --version | awk '{print $2}')
 echo RUST version:  $rustc_version
 echo =========================================================
 echo WARN: If rustc version is 1.82 or higher, after deploy you will get Deserialization ERROR!!!
-echo WARN: The error is "wasm execution failed with error: CompilationError(PrepareError(Deserialization))"
+echo WARN: teh worng rust version will compile, but the wasm binary will not work.
+echo WARN: You will get "CompilationError(PrepareError(Deserialization))" when running in the blockchain
 echo =========================================================
 GOOD_VERSION="1.81"
 if [[ $(echo -e "$rustc_version\n$GOOD_VERSION" | sort -V | head -n1) != "$GOOD_VERSION" ]]; then
