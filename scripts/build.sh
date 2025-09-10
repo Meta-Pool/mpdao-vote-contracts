@@ -22,5 +22,5 @@ cp -u target/wasm32-unknown-unknown/release/kv_store_contract.wasm res/
 cargo build -p mpip-contract --target wasm32-unknown-unknown --release
 cp -u target/wasm32-unknown-unknown/release/mpip_contract.wasm res/
 
-# cargo build -p test-meta-token --target wasm32-unknown-unknown --release
-# cp target/wasm32-unknown-unknown/release/test_meta_token.wasm res/
+cargo build -p test-meta-token --target wasm32-unknown-unknown --release
+cp target/wasm32-unknown-unknown/release/test_meta_token.wasm res/

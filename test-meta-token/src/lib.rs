@@ -26,12 +26,15 @@ use near_contract_standards::fungible_token::{
 use near_contract_standards::storage_management::{
     StorageBalance, StorageBalanceBounds, StorageManagement,
 };
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::{PanicOnDefault};
 use near_sdk::collections::LazyOption;
 use near_sdk::env::predecessor_account_id;
 use near_sdk::json_types::U128;
 use near_sdk::{assert_one_yocto, env, log, near_bindgen, require, AccountId, PromiseOrValue};
 
 #[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Contract {
     token: FungibleToken,
     metadata: LazyOption<FungibleTokenMetadata>,
