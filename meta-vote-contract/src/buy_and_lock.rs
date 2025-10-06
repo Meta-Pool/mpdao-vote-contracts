@@ -196,6 +196,12 @@ impl MetaVoteContract {
         token_and_amount: TokenAndAmount,
         msg: String,
     ) {
+        assert!(
+            // it is not possible, but let's close this route anyway
+            token_and_amount.token != near_as_account_id(),
+            "impossible: invalid ft: near"
+        );
+
         let options: ReceiveTokenOptions = near_sdk::serde_json::from_str(&msg)
             .unwrap_or_else(|_| env::panic_str("Invalid msg format. Must be JSON."));
 
