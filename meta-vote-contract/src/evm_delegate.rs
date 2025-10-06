@@ -85,7 +85,7 @@ impl MetaVoteContract {
         // claim
         self.claim_stnear_internal(
             &pseudo_account,
-            &env::predecessor_account_id().to_string(),
+            &env::predecessor_account_id().clone(),
             amount.0,
         )
 
@@ -158,6 +158,13 @@ impl MetaVoteContract {
     ) {
         // verify delegation and compose the pseudo near account
         let pseudo_account = self.verify_delegate(&evm_address);
+        log!(
+            "UNVOTE: delegate {} unvoted object {} at address {} as {}.",
+            &env::predecessor_account_id(),
+            &votable_object_id,
+            contract_address.as_str(),
+            pseudo_account
+        );
         self.internal_unvote(&pseudo_account, &contract_address, &votable_object_id)
     }
 

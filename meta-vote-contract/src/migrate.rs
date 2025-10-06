@@ -101,6 +101,10 @@ impl MetaVoteContract {
             min_claim_and_bond_days: old.min_claim_and_bond_days,
 
             timestamp_storage: old.timestamp_storage,
+
+            // new in this version
+            token_info: UnorderedMap::new(StorageKey::TokenInfo),
+            mpdao_prices: UnorderedMap::new(StorageKey::MpdaoPrices),
         }
     }
 }

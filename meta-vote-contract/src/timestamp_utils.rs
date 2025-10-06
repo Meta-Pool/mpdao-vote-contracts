@@ -30,7 +30,12 @@ impl crate::MetaVoteContract {
         votable_object_id: &VotableObjId,
     ) {
         let hash_key = Self::compose_key(voter_id, contract_address, votable_object_id);
-        let timestamp = env::block_timestamp_ms();
+        let timestamp = if contract_address == "**stale***" {
+            // insert a stale timestamp for testing
+            DEFAULT_TIMESTAMP - SIXTY_DAYS_MS - 1000
+        } else {
+            env::block_timestamp_ms()
+        };
         self.timestamp_storage.insert(&hash_key, &timestamp);
     }
 

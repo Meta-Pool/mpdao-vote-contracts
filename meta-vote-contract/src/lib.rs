@@ -1,4 +1,9 @@
-use crate::{constants::*, locking_position::*, utils::*};
+use crate::{
+    buy_and_lock::{MpdaoPrice, TokenInfo},
+    constants::*,
+    locking_position::*,
+    utils::*,
+};
 use near_sdk::{
     assert_one_yocto,
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -10,10 +15,10 @@ use near_sdk::{
 use types::*;
 use voter::Voter;
 
+mod buy_and_lock;
 mod constants;
 mod deposit;
 mod evm_delegate;
-mod interface;
 mod internal;
 mod locking_position;
 mod migrate;
@@ -73,6 +78,10 @@ pub struct MetaVoteContract {
 
     // timestamp storage with hashed keys - added 2025-08-26
     pub timestamp_storage: UnorderedMap<CryptoHash, u64>,
+
+    // token info & mpdao_prices - added 2025-10-5
+    pub token_info: UnorderedMap<AccountId, TokenInfo>,
+    pub mpdao_prices: UnorderedMap<AccountId, MpdaoPrice>,
 }
 
 #[near_bindgen]
@@ -124,10 +133,13 @@ impl MetaVoteContract {
             lock_votes_in_end_timestamp_ms: 0,
             lock_votes_in_address: None,
             lock_votes_in_numeric_id: 0,
+            #[deprecated(note = "mpdao_per_near_e24 is deprecated, use mpdao_prices instead")]
             mpdao_per_near_e24: 0,
             mpdao_avail_to_sell: 0,
             min_claim_and_bond_days: min_unbond_period,
             timestamp_storage: UnorderedMap::new(StorageKey::TimestampStorage),
+            token_info: UnorderedMap::new(StorageKey::TokenInfo),
+            mpdao_prices: UnorderedMap::new(StorageKey::MpdaoPrices),
         }
     }
 
@@ -227,9 +239,11 @@ impl MetaVoteContract {
     // claim stNear
     pub fn claim_stnear(&mut self, amount: U128String) -> Promise {
         let amount = amount.0;
-        let voter_id = env::predecessor_account_id().to_string();
-        let receiver = voter_id.clone();
-        self.claim_stnear_internal(&voter_id, &receiver, amount)
+        self.claim_stnear_internal(
+            &env::predecessor_account_id().to_string(),
+            &env::predecessor_account_id(),
+            amount,
+        )
         //self.remove_claimable_stnear(&voter_id, amount);
         //self.transfer_claimable_stnear_to_receiver(&voter_id, &receiver, amount)
     }
@@ -727,17 +741,16 @@ impl MetaVoteContract {
             &contract_address,
             &votable_object_id,
         );
-
-        log!(
-            "UNVOTE: {} unvoted object {} at address {}.",
-            &voter_id,
-            &votable_object_id,
-            contract_address.as_str()
-        );
     }
 
     pub fn unvote(&mut self, contract_address: ContractAddress, votable_object_id: VotableObjId) {
         let voter_id = env::predecessor_account_id().as_str().to_string();
+        log!(
+            "UNVOTE: {} unvoted object {} at address {}.",
+            &env::predecessor_account_id(),
+            &votable_object_id,
+            contract_address.as_str()
+        );
         self.internal_unvote(&voter_id, &contract_address, &votable_object_id)
     }
 
@@ -776,10 +789,11 @@ impl MetaVoteContract {
     // remove votes that are verified as stale
     pub fn remove_stale_votes_by_list(&mut self, list_to_remove: Vec<StaleVoteInput>) {
         self.assert_operator();
-
+        let mut count = 0;
         for r in list_to_remove {
             if self.verify_vote_is_stale(&r.voter_id, &r.contract_address, &r.votable_object_id) {
                 self.internal_unvote(&r.voter_id, &r.contract_address, &r.votable_object_id);
+                count += 1;
             } else {
                 log!(
                     "WARN: Vote {} {} {} not stale, skipping...",
@@ -789,6 +803,7 @@ impl MetaVoteContract {
                 );
             }
         }
+        log!("Removed {} stale votes.", count);
     }
 
     /// Refresh validator votes for a user
@@ -845,82 +860,6 @@ impl MetaVoteContract {
             self.lock_votes_in_address,
             self.lock_votes_in_numeric_id,
         )
-    }
-
-    #[payable]
-    pub fn update_mpdao_per_near_e24(&mut self, mpdao_per_near_e24: U128String) {
-        self.assert_operator();
-        // sanity check
-        assert!(
-            mpdao_per_near_e24.0 >= ONE_NEAR,
-            "mpdao_per_near_e24 should be greater than ONE per NEAR"
-        );
-        self.mpdao_per_near_e24 = mpdao_per_near_e24.0;
-    }
-
-    #[payable]
-    pub fn update_mpdao_avail_to_sell(&mut self, mpdao_avail_to_sell: U128String) {
-        self.assert_only_owner();
-        self.mpdao_avail_to_sell = mpdao_avail_to_sell.0;
-    }
-
-    #[payable]
-    pub fn buy_lock_and_vote(
-        &mut self,
-        days: u16,
-        contract_address: ContractAddress,
-        votable_object_id: VotableObjId,
-    ) {
-        // sanity check
-        assert!(
-            self.mpdao_per_near_e24 >= ONE_NEAR,
-            "invalid mpdao_per_near_e24"
-        );
-        let amount_near = env::attached_deposit();
-        assert!(
-            amount_near >= ONE_NEAR / 100,
-            "Minimum deposit amount is 0.01 NEAR."
-        );
-        let voter_id = env::predecessor_account_id().as_str().to_string();
-        let mut voter = self.internal_get_voter(&voter_id);
-        let mpdao_amount_e24 = proportional(amount_near, self.mpdao_per_near_e24, ONE_NEAR);
-        let mpdao_amount = mpdao_amount_e24 / E18;
-
-        assert!(
-            self.mpdao_avail_to_sell >= mpdao_amount,
-            "Not enough mpDAO available to sell."
-        );
-        self.mpdao_avail_to_sell -= mpdao_amount;
-
-        self.deposit_locking_position(mpdao_amount, days, &voter_id, &mut voter);
-
-        let voting_power = utils::calculate_voting_power(mpdao_amount, days);
-        log!(
-            "buy_lock_and_vote: {} {} yNEAR => {} mpDAO",
-            voter_id,
-            amount_near,
-            mpdao_amount
-        );
-        self.internal_vote(
-            &voter_id,
-            voting_power.into(),
-            contract_address,
-            votable_object_id,
-        )
-    }
-
-    // If extra NEAR balance (from buy_lock_and_vote)
-    // transfer to owner
-    pub fn transfer_extra_balance(&mut self) -> U128String {
-        let storage_cost = env::storage_usage() as u128 * env::storage_byte_cost();
-        let extra_balance = env::account_balance() - storage_cost;
-        if extra_balance >= 6 * ONE_NEAR {
-            // only if there's more than 6 NEAR to transfer, and leave 5 extra NEAR to backup the storage an extra 500kb
-            let extra = extra_balance - 5 * ONE_NEAR;
-            Promise::new(self.owner_id.clone()).transfer(extra);
-            return extra.into();
-        }
-        return 0.into();
     }
 
     #[payable]

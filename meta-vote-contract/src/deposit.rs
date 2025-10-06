@@ -1,3 +1,4 @@
+use crate::buy_and_lock::TokenAndAmount;
 use crate::*;
 use near_sdk::json_types::U128;
 use near_sdk::{env, log, near_bindgen, serde_json, PromiseOrValue};
@@ -18,7 +19,15 @@ impl FungibleTokenReceiver for MetaVoteContract {
     ) -> PromiseOrValue<U128> {
         let amount = amount.0;
 
-        // deposit for-claims, msg == "for-claims" means mpDAO to be later distributed to voters
+        log!(
+            "Received FT token: {} {} from {}",
+            env::predecessor_account_id(),
+            amount,
+            sender_id
+        );
+
+        // if msg == "for-claims:[['account',amount],...]"
+        // means tokens to be later distributed to voters (deposit for-claims)
         // it could be stNEAR or mpDAO (checked at fn distribute_for_claims)
         if msg.len() >= 11 && &msg[..11] == "for-claims:" {
             match serde_json::from_str(&msg[11..]) {
@@ -26,14 +35,11 @@ impl FungibleTokenReceiver for MetaVoteContract {
                 Err(_) => panic!("Err parsing msg for-claims"),
             };
         }
-        // else, user deposit of mpDAO to bond for x days
-        else {
-            assert_eq!(
-                env::predecessor_account_id(),
-                self.mpdao_token_contract_address,
-                "You can only bond mpDAO-token, contract:{}",
-                self.mpdao_token_contract_address.to_string()
-            );
+        // if we're receiving mpDAO
+        // then it is a deposit & lock (for sender or others)
+        else if env::predecessor_account_id() == self.mpdao_token_contract_address {
+            // lock: user deposit of mpDAO to bond for x days
+            // check if msg format is JSON array: ["voter_id",days] ?
             let (voter_id, days) = if msg.len() >= 1 && &msg[..1] == "[" {
                 // deposit & bond for others
                 match serde_json::from_str::<(String, u16)>(&msg) {
@@ -46,17 +52,27 @@ impl FungibleTokenReceiver for MetaVoteContract {
                     }
                 }
             } else {
+                // assume msg is number of days for lock
                 // self-deposit & bond
                 match msg.parse::<Days>() {
                     Ok(days) => (sender_id.to_string(), days),
                     Err(_) => panic!("Err parsing bonding_days from msg. Must be u16"),
                 }
             };
-
+            // lock mpDAO for signer or others
             self.assert_min_deposit_amount(amount);
-            log!("DEPOSIT: {} mpDAO deposited from {}", amount, &voter_id,);
             let mut voter = self.internal_get_voter(&voter_id);
             self.deposit_locking_position(amount, days, &voter_id, &mut voter);
+        } else {
+            // receiving other tokens, check for valid buy, lock [and vote] commands
+            self.internal_ft_token_received(
+                sender_id,
+                TokenAndAmount {
+                    token: env::predecessor_account_id(),
+                    amount,
+                },
+                msg,
+            );
         }
         // Return unused amount
         PromiseOrValue::Value(U128::from(0))

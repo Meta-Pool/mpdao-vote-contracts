@@ -167,13 +167,13 @@ impl MetaVoteContract {
     pub(crate) fn claim_stnear_internal(
         &mut self,
         voter_id: &String,
-        receiver_id: &String,
+        receiver_id: &AccountId,
         amount: u128,
     ) -> Promise {
         // remove claim
         self.remove_claimable_stnear(&voter_id, amount);
         // transfer to destination
-        self.transfer_claimable_stnear_to_receiver(&voter_id, &receiver_id, amount)
+        self.transfer_claimable_stnear_to_receiver(&voter_id, receiver_id, amount)
     }
 
     pub(crate) fn claim_and_bond_internal(
