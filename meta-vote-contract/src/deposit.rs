@@ -1,4 +1,4 @@
-use crate::buy_and_lock::TokenAndAmount;
+use crate::buy_and_lock::{ReceiveTokenOptions, TokenAndAmount};
 use crate::*;
 use near_sdk::json_types::U128;
 use near_sdk::{env, log, near_bindgen, serde_json, PromiseOrValue};
@@ -36,33 +36,48 @@ impl FungibleTokenReceiver for MetaVoteContract {
             };
         }
         // if we're receiving mpDAO
-        // then it is a deposit & lock (for sender or others)
+        // then it is a deposit & lock [& vote] (for sender or others)
         else if env::predecessor_account_id() == self.mpdao_token_contract_address {
             // lock: user deposit of mpDAO to bond for x days
-            // check if msg format is JSON array: ["voter_id",days] ?
-            let (voter_id, days) = if msg.len() >= 1 && &msg[..1] == "[" {
-                // deposit & bond for others
-                match serde_json::from_str::<(String, u16)>(&msg) {
-                    Ok(voter_and_days) => {
-                        // sending user wants to lock for others. Normally meta pool DAO granting locked mpDAO to collaborators
-                        voter_and_days // assign to voter_id, days
-                    }
-                    Err(_) => {
-                        panic!("Err parsing msg, expected [voter_id,days]")
-                    }
-                }
-            } else {
-                // assume msg is number of days for lock
-                // self-deposit & bond
-                match msg.parse::<Days>() {
-                    Ok(days) => (sender_id.to_string(), days),
-                    Err(_) => panic!("Err parsing bonding_days from msg. Must be u16"),
-                }
-            };
-            // lock mpDAO for signer or others
             self.assert_min_deposit_amount(amount);
-            let mut voter = self.internal_get_voter(&voter_id);
-            self.deposit_locking_position(amount, days, &voter_id, &mut voter);
+            // check msg format:
+            // {...} as ReceiveTokenOptions
+            // or JSON array: ["voter_id",days]
+            // or just number of days as string: "30"
+            if msg.len() >= 1 && &msg[..1] == "{" {
+                // new format, lock & optionally vote:
+                // msg is JSON object ReceiveTokenOptions
+                let options: ReceiveTokenOptions = near_sdk::serde_json::from_str(&msg)
+                    .unwrap_or_else(|_| {
+                        env::panic_str("Invalid msg format. Must be JSON ReceiveTokenOptions")
+                    });
+                self.lock_and_optionally_vote(sender_id, amount, &options);
+            } else {
+                // old format:
+                // check if msg is JSON array: ["voter_id",days]`
+                let (voter_id, days) = if msg.len() >= 1 && &msg[..1] == "[" {
+                    // deposit & bond for others
+                    match serde_json::from_str::<(String, u16)>(&msg) {
+                        Ok(voter_and_days) => {
+                            // sending user wants to lock for others. Normally meta pool DAO granting locked mpDAO to collaborators
+                            voter_and_days // assign to voter_id, days
+                        }
+                        Err(_) => {
+                            panic!("Err parsing msg, expected [voter_id,days]")
+                        }
+                    }
+                } else {
+                    // assume msg is number of days for lock
+                    // self-deposit & bond
+                    match msg.parse::<Days>() {
+                        Ok(days) => (sender_id.to_string(), days),
+                        Err(_) => panic!("Err parsing bonding_days from msg. Must be u16"),
+                    }
+                };
+                // lock mpDAO for signer or others
+                let mut voter = self.internal_get_voter(&voter_id);
+                self.deposit_locking_position(amount, days, &voter_id, &mut voter);
+            }
         } else {
             // receiving other tokens, check for valid buy, lock [and vote] commands
             self.internal_ft_token_received(

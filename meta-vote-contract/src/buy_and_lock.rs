@@ -39,7 +39,7 @@ pub struct MpdaoPrice {
 impl MpdaoPrice {
     pub fn assert_not_stale(&self) {
         assert!(
-            env::block_timestamp_ms() < self.updated_at_ms + 10 * MINUTES_IN_MS,
+            env::block_timestamp_ms() < self.updated_at_ms + 20 * MINUTES_IN_MS,
             "price is stale"
         );
     }
@@ -132,9 +132,17 @@ impl MetaVoteContract {
     pub fn get_token_info(&self, token_address: &AccountId) -> Option<TokenInfo> {
         self.token_info.get(token_address)
     }
+    /// get all price info for all tokens configured
+    pub fn get_all_token_info(&self) -> Vec<(AccountId, TokenInfo)> {
+        self.token_info.to_vec()
+    }
     /// get current price for a given token address
     pub fn get_token_price(&self, token_address: &AccountId) -> Option<MpdaoPrice> {
         self.mpdao_prices.get(token_address)
+    }
+    /// get all price info for all tokens configured
+    pub fn get_all_token_prices(&self) -> Vec<(AccountId, MpdaoPrice)> {
+        self.mpdao_prices.to_vec()
     }
 
     /// batch update prices for tokens configured
@@ -165,18 +173,20 @@ impl MetaVoteContract {
     }
 
     /// Buy & Lock [and vote] mpDAO with NEAR
+    /// if no contract_address or votable_object_id, is just buy & lock
     #[payable]
     pub fn buy_lock_and_vote(
         &mut self,
         days: u16,
-        contract_address: ContractAddress,
-        votable_object_id: VotableObjId,
+        beneficiary: Option<String>,
+        contract_address: Option<ContractAddress>,
+        votable_object_id: Option<VotableObjId>,
     ) {
         let options = ReceiveTokenOptions {
             days,
-            beneficiary: None,
-            contract_address: Some(contract_address),
-            votable_object_id: Some(votable_object_id),
+            beneficiary,
+            contract_address,
+            votable_object_id,
         };
         self.receive_sell_lock_and_vote(
             env::predecessor_account_id(),
@@ -248,16 +258,42 @@ impl MetaVoteContract {
         token_info.amount_received += token_and_amount.amount;
         self.token_info.insert(&token_and_amount.token, &token_info);
 
+        log!(
+            "{} bought {} mpDAO with {} {}",
+            sender_id,
+            mpdao_amount,
+            token_and_amount.amount,
+            token_and_amount.token
+        );
+
+        self.lock_and_optionally_vote(sender_id, mpdao_amount, &options);
+    }
+
+    /// Lock mpdao_amount for the beneficiary (or sender) and optionally vote
+    pub(crate) fn lock_and_optionally_vote(
+        &mut self,
+        sender_id: AccountId,
+        mpdao_amount: u128,
+        options: &ReceiveTokenOptions,
+    ) {
         // lock for sender or others
-        let voter_id = options.beneficiary.unwrap_or(sender_id.to_string());
+        let voter_id = options.beneficiary.clone().unwrap_or(sender_id.to_string());
         let mut voter = self.internal_get_voter(&voter_id);
         self.deposit_locking_position(mpdao_amount, options.days, &voter_id, &mut voter);
 
+        log!(
+            "{} locked {} mpDAO {} days",
+            voter_id,
+            mpdao_amount,
+            options.days
+        );
+
         // if it is also a vote command, vote
-        let voting_power = utils::calculate_voting_power(mpdao_amount, options.days);
-        if let (Some(contract_address), Some(votable_object_id)) =
-            (options.contract_address, options.votable_object_id)
-        {
+        if let (Some(contract_address), Some(votable_object_id)) = (
+            options.contract_address.clone(),
+            options.votable_object_id.clone(),
+        ) {
+            let voting_power = utils::calculate_voting_power(mpdao_amount, options.days);
             self.internal_vote(
                 &voter_id,
                 voting_power.into(),
@@ -265,13 +301,6 @@ impl MetaVoteContract {
                 votable_object_id,
             );
         }
-
-        log!(
-            "buy_lock_and_vote: {} {} mpDAO {} vp",
-            voter_id,
-            mpdao_amount,
-            voting_power
-        );
     }
 
     #[payable]
