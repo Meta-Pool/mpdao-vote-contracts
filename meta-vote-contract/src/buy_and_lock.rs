@@ -15,7 +15,7 @@ pub struct TokenInfo {
 }
 impl TokenInfo {
     pub fn compute_mpdao_amount(&self, token_amount: u128, price: &MpdaoPrice) -> u128 {
-        price.assert_not_stale();
+        price.assert_valid_price();
         // mpdao_per_token_e9 is in e9, token_amount is in token_decimals, result is in e6 (mpdao has 6 decimals)
         let mpdao_amount = proportional(
             token_amount,
@@ -35,13 +35,15 @@ impl TokenInfo {
 pub struct MpdaoPrice {
     pub mpdao_per_token_e9: u64, // price in mpDAO with 6 decimals, e.g. 1000000 = 1 mpDAO per token
     pub updated_at_ms: u64,      // price last updated timestamp in milliseconds
+    pub paused: bool, // if true, buying with this token is paused -- used when price is too volatile
 }
 impl MpdaoPrice {
-    pub fn assert_not_stale(&self) {
-        assert!(
+    pub fn assert_valid_price(&self) {
+        require!(
             env::block_timestamp_ms() < self.updated_at_ms + 20 * MINUTES_IN_MS,
             "price is stale"
         );
+        require!(!self.paused, "buying with this token is paused");
     }
 }
 
@@ -52,6 +54,7 @@ impl MpdaoPrice {
 pub struct UpdatePriceJsonItem {
     pub token_contract: AccountId,
     pub mpdao_per_token_e9: U64,
+    pub paused: bool,
 }
 
 /// this struct can be sent in msg of ft_transfer_call
@@ -145,6 +148,13 @@ impl MetaVoteContract {
         self.mpdao_prices.to_vec()
     }
 
+    /// delete all price info, effectively stopping all buys
+    #[payable]
+    pub fn delete_all_token_prices(&mut self) {
+        assert_one_yocto();
+        self.assert_operator();
+        self.mpdao_prices.clear();
+    }
     /// batch update prices for tokens configured
     #[payable]
     pub fn update_mpdao_prices(&mut self, prices: Vec<UpdatePriceJsonItem>) {
@@ -167,6 +177,7 @@ impl MetaVoteContract {
                 &MpdaoPrice {
                     mpdao_per_token_e9: price.mpdao_per_token_e9.0,
                     updated_at_ms: env::block_timestamp_ms(),
+                    paused: price.paused,
                 },
             );
         }
