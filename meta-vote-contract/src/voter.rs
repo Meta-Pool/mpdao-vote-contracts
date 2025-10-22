@@ -10,13 +10,16 @@ pub struct VoterJSON {
     pub locking_positions: Vec<LockingPositionJSON>, // sum here to get total voting power
     pub voting_power: U128String,                    // available voting power
     pub vote_positions: Vec<VotePositionJSON>,       // sum here to get used voting power
+    pub delegated_vp: U128String,                    // how much of the available vp is delegated
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Voter {
     pub balance: MpDAOAmount,
     pub locking_positions: Vector<LockingPosition>,
-    pub available_voting_power: u128, // available voting power, equals to sum(lp.voting_power)-sum(vp.voting_power)
+    /// available voting power, equals to: delegated + sum(locked_positions.voting_power) - sum(vote_positions.voting_power)
+    /// can be recomputed from scratch by operator_recompute_available_vp()
+    pub available_voting_power: u128,
     pub vote_positions: UnorderedMap<ContractAddress, UnorderedMap<VotableObjId, u128>>,
 }
 
@@ -69,7 +72,7 @@ impl Voter {
     }
 
     // /** sum all voting power from locked positions */
-    pub(crate) fn sum_voting_power(&self) -> u128 {
+    pub(crate) fn sum_locked_vp(&self) -> u128 {
         self.locking_positions
             .iter()
             .filter(|locking_position| locking_position.is_locked())
@@ -78,11 +81,10 @@ impl Voter {
     }
 
     pub(crate) fn sum_used_votes(&self) -> u128 {
-        let mut result = 0_u128;
-        for map in self.vote_positions.values() {
-            result += map.values().sum::<u128>();
-        }
-        result
+        self.vote_positions
+            .values()
+            .map(|map| map.values().sum::<u128>())
+            .sum()
     }
 
     pub(crate) fn find_locked_position(&self, unbond_days: Days) -> Option<u64> {
@@ -160,6 +162,7 @@ impl Voter {
             balance_in_contract: self.balance.into(),
             locking_positions,
             voting_power: self.available_voting_power.into(),
+            delegated_vp: main.get_delegated_vp(voter_id).into(),
             vote_positions,
         }
     }

@@ -92,6 +92,7 @@ impl MetaVoteContract {
                 locking_positions: vec![],
                 balance_in_contract: 0.into(),
                 voting_power: 0.into(),
+                delegated_vp: 0.into(),
                 vote_positions: vec![],
             }
         }
@@ -178,7 +179,7 @@ impl MetaVoteContract {
 
     pub fn voter_total_voting_power(&self, voter_id: VoterId) -> U128String {
         let voter = self.internal_get_voter(&voter_id);
-        voter.sum_voting_power().into()
+        voter.sum_locked_vp().into()
     }
 
     pub fn get_available_voting_power(&self, voter_id: VoterId) -> U128String {

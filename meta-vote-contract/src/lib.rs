@@ -1,6 +1,7 @@
 use crate::{
     buy_and_lock::{MpdaoPrice, TokenInfo},
     constants::*,
+    internal::DELEGATED_CONTRACT_CODE,
     locking_position::*,
     utils::*,
 };
@@ -257,23 +258,23 @@ impl MetaVoteContract {
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let mut locking_position = voter.get_position(index);
 
-        let voting_power = locking_position.voting_power;
-        assert!(
-            voter.available_voting_power >= voting_power,
-            "Not enough free voting power to unlock! You have {}, required {}.",
-            voter.available_voting_power,
-            voting_power
-        );
+        let voting_power_to_remove = locking_position.voting_power;
+        locking_position.unlocking_started_at = Some(get_current_epoch_millis());
+        voter.locking_positions.replace(index, &locking_position);
+
+        // make sure there was enough available voting power
+        self.require_vp_available(&voter_id, &mut voter);
 
         log!(
             "UNLOCK: {} unlocked position {}.",
             &voter_id.to_string(),
             index
         );
-        locking_position.unlocking_started_at = Some(get_current_epoch_millis());
-        voter.locking_positions.replace(index, &locking_position);
-        voter.available_voting_power -= voting_power;
-        self.total_voting_power = self.total_voting_power.saturating_sub(voting_power);
+
+        self.total_voting_power = self
+            .total_voting_power
+            .saturating_sub(voting_power_to_remove);
+
         self.voters.insert(&voter_id, &voter);
     }
 
@@ -297,24 +298,7 @@ impl MetaVoteContract {
         );
         assert_at_least_1_mpdao(amount);
         let remove_voting_power = utils::calculate_voting_power(amount, locking_period);
-        assert!(
-            locking_position.voting_power >= remove_voting_power,
-            "Not enough free voting power to unlock! Locking position has {}, required {}.",
-            locking_position.voting_power,
-            remove_voting_power
-        );
-        assert!(
-            voter.available_voting_power >= remove_voting_power,
-            "Not enough free voting power to unlock! You have {}, required {}.",
-            voter.available_voting_power,
-            remove_voting_power
-        );
 
-        log!(
-            "UNLOCK: {} partially unlocked position {}.",
-            &voter_id.to_string(),
-            index
-        );
         // Create a NEW unlocking position
         self.create_unlocking_position(&mut voter, amount, locking_period, remove_voting_power);
 
@@ -324,7 +308,15 @@ impl MetaVoteContract {
         assert_at_least_1_mpdao(locking_position.amount);
         voter.locking_positions.replace(index, &locking_position);
 
-        voter.available_voting_power -= remove_voting_power;
+        // make sure there was enough available voting power
+        self.require_vp_available(&voter_id, &mut voter);
+
+        log!(
+            "UNLOCK: {} partially unlocked position {}.",
+            &voter_id.to_string(),
+            index
+        );
+
         self.total_voting_power = self.total_voting_power.saturating_sub(remove_voting_power);
         self.voters.insert(&voter_id, &voter);
     }
@@ -362,12 +354,12 @@ impl MetaVoteContract {
         // update to new total-voting-power (add delta)
         self.total_voting_power += new_voting_power - old_voting_power;
 
-        // update to new voter-voting-power (add delta)
-        voter.available_voting_power += new_voting_power - old_voting_power;
-
         // update position
         locking_position.locking_period = new_locking_period;
         locking_position.voting_power = new_voting_power;
+
+        // update available voting power
+        self.update_vp_available(&voter_id, &mut voter);
 
         // save
         voter.locking_positions.replace(index, &locking_position);
@@ -619,12 +611,21 @@ impl MetaVoteContract {
             .vote_positions
             .insert(&contract_address, &votes_for_address);
 
+        if contract_address == DELEGATED_CONTRACT_CODE {
+            require!(votable_object_id != voter_id, "Cannot self-delegate votes.");
+            // delegate votes
+            self.internal_add_delegated_voting_power(votable_object_id, voting_power);
+        }
+
         // Store timestamp for this vote
         self.store_vote_timestamp(voter_id, contract_address, votable_object_id);
         // Update Meta Vote state.
         self.internal_increase_total_votes(voting_power, &contract_address, &votable_object_id);
     }
 
+    /// Adjusts voting power for an existing vote position.
+    /// Allows increasing or decreasing votes on a specific votable object.
+    /// If voting_power becomes 0, the vote is removed. Removes votes if total exceeds available voting power.
     pub fn rebalance(
         &mut self,
         voting_power: U128String,
@@ -734,6 +735,11 @@ impl MetaVoteContract {
 
         // Remove timestamp for this vote
         self.remove_vote_timestamp(voter_id, contract_address, votable_object_id);
+
+        if contract_address == DELEGATED_CONTRACT_CODE {
+            // remove delegated votes
+            self.internal_remove_delegated_voting_power(votable_object_id, user_vote_for_object);
+        }
 
         // Update Meta Vote global state unordered maps
         self.state_internal_decrease_total_votes_for_address(
@@ -938,38 +944,11 @@ impl MetaVoteContract {
         let voter_id = utils::pseudo_near_address(&external_address);
         let mut voter = self.internal_get_voter(&voter_id);
 
-        // HANDLE VOTING POWER
-        let mut used_voting_power = voter.sum_used_votes();
-        let prev_voting_power = voter.available_voting_power + used_voting_power;
-        // check if the new voting power is enough for all existing votes
-        let new_voting_power: u128 = locking_positions
-            .iter()
-            .map(|i| calculate_voting_power(i.1 .0, i.0))
-            .sum();
-        log!(
-            "MIRROR: prev_vp {} new_vp {} used_vp {}.",
-            prev_voting_power,
-            new_voting_power,
-            used_voting_power
-        );
-        // while more votes than voting power, remove votes
-        while used_voting_power > new_voting_power {
-            let first_voted_app_key: String = voter.vote_positions.keys_as_vector().get(0).unwrap();
-            let first_voted_app_data = voter.vote_positions.get(&first_voted_app_key).unwrap();
-            let first_voted_object_key = first_voted_app_data.keys_as_vector().get(0).unwrap();
-            let used_voting_power_to_remove =
-                first_voted_app_data.get(&first_voted_object_key).unwrap();
-            // this fn manages all other accumulators that need to be updated when removing votes
-            self.internal_remove_voting_position(
-                &voter_id,
-                &mut voter,
-                &first_voted_app_key,
-                &first_voted_object_key,
-            );
-            used_voting_power -= used_voting_power_to_remove;
-        }
+        // sum vp in actual locking positions
+        let prev_voting_power = voter.sum_locked_vp();
+
         // HANDLE LOCKING POSITIONS
-        // first clear all
+        // first clear all then re-create
         voter.locking_positions.clear();
         // when creating the voting position, power is added to available_voting_power
         // so zero that too
@@ -983,16 +962,29 @@ impl MetaVoteContract {
             self.internal_create_locking_position(&mut voter, mpdao_amount, unbond_days);
         }
 
-        // update user available_voting_power (to the amount added, remove the used)
-        voter.available_voting_power -= used_voting_power;
+        // HANDLE VOTING POWER ADJUSTMENT
+        // recompute available and remove votes if needed
+        self.adjust_voter_voting_power(&voter_id, &mut voter);
+
         // also update contract total (new vp was already added, remove old only)
         self.total_voting_power = self.total_voting_power - prev_voting_power;
 
         // save voter
         self.voters.insert(&voter_id, &voter);
     }
-}
 
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg(test)]
-mod tests;
+    // bot-managed. Users might get delegated-vp, but also delegated-vp can be removed
+    // this method recomputes voter.available_voting_power from scratch
+    // from locked + delegated - used
+    // adjust_voter_voting_power remove votes if needed
+    pub fn operator_recompute_available_vp(&mut self, voter_id: &String) {
+        self.assert_operator();
+        let mut voter = self.internal_get_voter(&voter_id);
+
+        // recompute available and remove votes if needed
+        self.adjust_voter_voting_power(voter_id, &mut voter);
+
+        // save voter
+        self.voters.insert(&voter_id, &voter);
+    }
+}

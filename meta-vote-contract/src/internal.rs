@@ -1,5 +1,7 @@
 use crate::*;
 
+pub const DELEGATED_CONTRACT_CODE: &str = "delegated";
+
 impl MetaVoteContract {
     pub(crate) fn assert_only_owner(&self) {
         require!(
@@ -20,6 +22,98 @@ impl MetaVoteContract {
             "Minimum deposit amount is {} mpDAO.",
             self.min_deposit_amount
         );
+    }
+
+    /// get the delegated vote amount for a delegate (user_id == votable object_id)
+    /// in order to delegate votes, a user "votes" for the delegate, and that vp is assigned to the delegate
+    pub(crate) fn get_delegated_vp(&self, user_id: &VotableObjId) -> u128 {
+        match self.votes.get(&DELEGATED_CONTRACT_CODE.into()) {
+            Some(object) => object.get(&user_id).unwrap_or(0_u128),
+            None => 0_u128,
+        }
+    }
+
+    pub(crate) fn internal_add_delegated_voting_power(
+        &mut self,
+        delegate_id: &String,
+        voting_power: u128,
+    ) {
+        let mut delegate = self.internal_get_voter_or_panic(&delegate_id);
+        delegate.available_voting_power += voting_power;
+        // save delegate
+        self.voters.insert(&delegate_id, &delegate);
+    }
+
+    pub(crate) fn internal_remove_delegated_voting_power(
+        &mut self,
+        delegate_id: &String,
+        voting_power: u128,
+    ) {
+        let delegate = self.voters.get(&delegate_id);
+        if let Some(mut delegate) = delegate {
+            delegate.available_voting_power =
+                delegate.available_voting_power.saturating_sub(voting_power);
+            // save delegate
+            self.voters.insert(&delegate_id, &delegate);
+        }
+    }
+
+    /// call this after altering locking positions to ensure enough free voting power
+    /// existed before the change
+    pub(crate) fn internal_common_update_available(
+        &self,
+        require: bool,
+        voter_id: &String,
+        voter: &mut Voter,
+    ) {
+        let full_voting_power = self.get_delegated_vp(voter_id) + voter.sum_locked_vp();
+        let used_voting_power = voter.sum_used_votes();
+        if require {
+            require!(
+            // here the user is unlocking their own positions, so self.delegated_vp(&voter_id) does not applies
+            full_voting_power >= used_voting_power,
+            "Not enough free voting power to unlock! You need to free more vp by removing votes.",
+        );
+        }
+        // update available vp just in case
+        voter.available_voting_power = full_voting_power.saturating_sub(used_voting_power);
+    }
+
+    /// call this to recompute available voting power after altering locking positions
+    /// without checking for sufficiency (saturating_sub is used)
+    pub(crate) fn update_vp_available(&self, voter_id: &String, voter: &mut Voter) {
+        self.internal_common_update_available(false, voter_id, voter);
+    }
+
+    /// call this after reducing locking positions to ensure enough free voting power
+    /// existed before the change
+    pub(crate) fn require_vp_available(&self, voter_id: &String, voter: &mut Voter) {
+        self.internal_common_update_available(true, voter_id, voter);
+    }
+
+    /// Recomputes the voter's available voting power from scratch.
+    pub(crate) fn adjust_voter_voting_power(&mut self, voter_id: &String, voter: &mut Voter) {
+        // HANDLE VOTING POWER ADJUSTMENT
+        let mut used_voting_power = voter.sum_used_votes();
+        let self_voting_power = voter.sum_locked_vp();
+        let new_voting_power: u128 = self_voting_power + self.get_delegated_vp(voter_id);
+        // while more votes than voting power, remove votes
+        while used_voting_power > new_voting_power {
+            let first_voted_app_key: String = voter.vote_positions.keys_as_vector().get(0).unwrap();
+            let first_voted_app_data = voter.vote_positions.get(&first_voted_app_key).unwrap();
+            let first_voted_object_key = first_voted_app_data.keys_as_vector().get(0).unwrap();
+            let used_voting_power_to_remove =
+                first_voted_app_data.get(&first_voted_object_key).unwrap();
+            // this fn manages all other accumulators that need to be updated when removing votes
+            self.internal_remove_voting_position(
+                voter_id,
+                voter,
+                &first_voted_app_key,
+                &first_voted_object_key,
+            );
+            used_voting_power -= used_voting_power_to_remove;
+        }
+        voter.available_voting_power = new_voting_power - used_voting_power;
     }
 
     /// Inner method to get or create a Voter.
