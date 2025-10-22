@@ -1,5 +1,5 @@
-use crate::*;
 use crate::utils::get_current_epoch_millis;
+use crate::*;
 use near_sdk::json_types::U128;
 use near_sdk::{env, require, PromiseResult};
 
@@ -179,20 +179,9 @@ impl MpipContract {
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Failed => env::panic_str("Meta Vote is not available!"),
-            PromiseResult::Successful(result) => {
-                let locking_positions =
-                    near_sdk::serde_json::from_slice::<Vec<LockingPositionJSON>>(&result).unwrap();
-                let mut result: Balance = 0;
-                for index in 0..locking_positions.len() {
-                    let locking_position = locking_positions
-                        .get(index)
-                        .expect("Locking position not found!");
-                    if locking_position.is_locked {
-                        result += locking_position.voting_power.0;
-                    }
-                }
-                result
-            }
+            PromiseResult::Successful(result) => near_sdk::serde_json::from_slice::<U128>(&result)
+                .unwrap()
+                .into(),
         }
     }
 

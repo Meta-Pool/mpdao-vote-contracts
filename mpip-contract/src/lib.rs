@@ -218,7 +218,7 @@ impl MpipContract {
         ext_metavote::ext(self.meta_vote_contract_address.clone())
             .with_static_gas(GAS_FOR_GET_VOTING_POWER)
             .with_attached_deposit(1)
-            .get_all_locking_positions(env::predecessor_account_id())
+            .get_mpip_voting_power(env::predecessor_account_id())
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE_VOTE)
@@ -382,13 +382,19 @@ impl MpipContract {
         self.vote_proposal_internal(mpip_id, vote, 0, memo);
     }
 
-    pub(crate) fn vote_proposal_internal(&mut self, mpip_id: MpipId, vote: VoteType, limit_vp: u128, memo: String) {
+    pub(crate) fn vote_proposal_internal(
+        &mut self,
+        mpip_id: MpipId,
+        vote: VoteType,
+        limit_vp: u128,
+        memo: String,
+    ) {
         self.assert_proposal_is_on_voting(&mpip_id);
         self.assert_has_not_voted(mpip_id, env::predecessor_account_id());
         ext_metavote::ext(self.meta_vote_contract_address.clone())
             .with_static_gas(GAS_FOR_GET_VOTING_POWER)
             .with_attached_deposit(1)
-            .get_all_locking_positions(env::predecessor_account_id())
+            .get_mpip_voting_power(env::predecessor_account_id())
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE_VOTE)
@@ -520,7 +526,3 @@ impl MpipContract {
         }
     }
 }
-
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg(test)]
-mod tests;

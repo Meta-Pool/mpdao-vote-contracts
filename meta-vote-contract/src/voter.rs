@@ -162,7 +162,7 @@ impl Voter {
             balance_in_contract: self.balance.into(),
             locking_positions,
             voting_power: self.available_voting_power.into(),
-            delegated_vp: main.get_delegated_vp(voter_id).into(),
+            delegated_vp: main.internal_get_delegated_vp(voter_id).into(),
             vote_positions,
         }
     }

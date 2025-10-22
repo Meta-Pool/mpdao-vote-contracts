@@ -8,8 +8,9 @@ use near_sdk::{ext_contract, AccountId};
 pub trait ExtMetaVote {
     // should call a fn to get all voting power (used or not) get_user_total_voting_power
     fn get_available_voting_power(&self, voter_id: VoterId);
-    fn get_all_locking_positions(&self, voter_id: VoterId);
+    //fn get_all_locking_positions(&self, voter_id: VoterId);
     fn get_total_voting_power(&self);
+    fn get_mpip_voting_power(&self, voter_id: VoterId);
 }
 
 #[allow(dead_code)]

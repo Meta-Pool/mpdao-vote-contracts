@@ -2,6 +2,12 @@ use crate::*;
 
 pub const DELEGATED_CONTRACT_CODE: &str = "delegated";
 
+struct VotePos {
+    pub votable_address: String,
+    pub votable_object_id: String,
+    pub voting_power: u128,
+}
+
 impl MetaVoteContract {
     pub(crate) fn assert_only_owner(&self) {
         require!(
@@ -26,7 +32,7 @@ impl MetaVoteContract {
 
     /// get the delegated vote amount for a delegate (user_id == votable object_id)
     /// in order to delegate votes, a user "votes" for the delegate, and that vp is assigned to the delegate
-    pub(crate) fn get_delegated_vp(&self, user_id: &VotableObjId) -> u128 {
+    pub(crate) fn internal_get_delegated_vp(&self, user_id: &VotableObjId) -> u128 {
         match self.votes.get(&DELEGATED_CONTRACT_CODE.into()) {
             Some(object) => object.get(&user_id).unwrap_or(0_u128),
             None => 0_u128,
@@ -66,7 +72,7 @@ impl MetaVoteContract {
         voter_id: &String,
         voter: &mut Voter,
     ) {
-        let full_voting_power = self.get_delegated_vp(voter_id) + voter.sum_locked_vp();
+        let full_voting_power = self.internal_get_delegated_vp(voter_id) + voter.sum_locked_vp();
         let used_voting_power = voter.sum_used_votes();
         if require {
             require!(
@@ -96,22 +102,45 @@ impl MetaVoteContract {
         // HANDLE VOTING POWER ADJUSTMENT
         let mut used_voting_power = voter.sum_used_votes();
         let self_voting_power = voter.sum_locked_vp();
-        let new_voting_power: u128 = self_voting_power + self.get_delegated_vp(voter_id);
+        let new_voting_power: u128 = self_voting_power + self.internal_get_delegated_vp(voter_id);
         // while more votes than voting power, remove votes
-        while used_voting_power > new_voting_power {
-            let first_voted_app_key: String = voter.vote_positions.keys_as_vector().get(0).unwrap();
-            let first_voted_app_data = voter.vote_positions.get(&first_voted_app_key).unwrap();
-            let first_voted_object_key = first_voted_app_data.keys_as_vector().get(0).unwrap();
-            let used_voting_power_to_remove =
-                first_voted_app_data.get(&first_voted_object_key).unwrap();
-            // this fn manages all other accumulators that need to be updated when removing votes
-            self.internal_remove_voting_position(
-                voter_id,
-                voter,
-                &first_voted_app_key,
-                &first_voted_object_key,
-            );
-            used_voting_power -= used_voting_power_to_remove;
+        if used_voting_power > new_voting_power {
+            // get all voting positions sorted by voting power (ascending)
+            let mut vote_positions_by_power = std::collections::BTreeMap::new();
+            for address in voter.vote_positions.keys_as_vector().iter() {
+                let pos = voter.vote_positions.get(&address).unwrap();
+                for obj in pos.keys_as_vector().iter() {
+                    let voting_power = pos.get(&obj).unwrap();
+                    vote_positions_by_power.insert(
+                        (voting_power, address.clone(), obj.clone()),
+                        VotePos {
+                            votable_address: address.as_str().to_string(),
+                            votable_object_id: obj,
+                            voting_power,
+                        },
+                    );
+                }
+            }
+
+            // remove votes starting with the smaller ones by voting power (BTreeMap is naturally sorted)
+            for (_, vote_pos) in vote_positions_by_power.iter() {
+                if used_voting_power <= new_voting_power {
+                    break;
+                }
+                self.internal_remove_voting_position(
+                    voter_id,
+                    voter,
+                    &vote_pos.votable_address,
+                    &vote_pos.votable_object_id,
+                );
+                log!(
+                    "Removed vote for {} / {} of {} vp",
+                    vote_pos.votable_address,
+                    vote_pos.votable_object_id,
+                    vote_pos.voting_power
+                );
+                used_voting_power -= vote_pos.voting_power;
+            }
         }
         voter.available_voting_power = new_voting_power - used_voting_power;
     }
