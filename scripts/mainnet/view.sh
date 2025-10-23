@@ -3,6 +3,10 @@ __dir=$(dirname "$0")
 . $__dir/mainnet-set-vars.sh
 . $__dir/declare_get_mpdao_balance.sh
 
+NEAR_ENV=mainnet near view $METAVOTE_CONTRACT_ADDRESS get_votes_by_app '{"app_or_contract_address":"metastaking.app"}'
+exit 0
+
+# cSpell:disable
 #NEAR_ENV=mainnet near view mpdao-vote get_used_voting_power '{"voter_id":"vhieu.testnet"}'
 #NEAR_ENV=mainnet near view mpdao-vote.near get_contract_info '{}'
 

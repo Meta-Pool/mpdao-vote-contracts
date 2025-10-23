@@ -1,3 +1,4 @@
+use crate::internal::DELEGATED_CONTRACT_CODE;
 use crate::types::*;
 use crate::{voter::VoterJSON, MetaVoteContract, MetaVoteContractExt, StorageKey};
 use near_sdk::{
@@ -92,6 +93,7 @@ impl MetaVoteContract {
                 locking_positions: vec![],
                 balance_in_contract: 0.into(),
                 voting_power: 0.into(),
+                delegated_vp: 0.into(),
                 vote_positions: vec![],
             }
         }
@@ -176,16 +178,47 @@ impl MetaVoteContract {
         voter.sum_unlocking().into()
     }
 
-    pub fn voter_total_voting_power(&self, voter_id: VoterId) -> U128String {
+    /// voter: MPIP voting power. Zero if this user has delegated some voting power
+    pub fn get_mpip_voting_power(&self, voter_id: VoterId) -> U128String {
         let voter = self.internal_get_voter(&voter_id);
-        voter.sum_voting_power().into()
+        // if the user has voted in contract_id == DELEGATED_CONTRACT_CODE, return zero
+        if self
+            .votes
+            .get(&DELEGATED_CONTRACT_CODE.to_string())
+            .is_some()
+        {
+            return 0.into();
+        }
+        voter.sum_locked_vp().into()
     }
 
+    /// self-voting power, does not include delegated voting power
+    pub fn voter_self_voting_power(&self, voter_id: VoterId) -> U128String {
+        let voter = self.internal_get_voter(&voter_id);
+        voter.sum_locked_vp().into()
+    }
+
+    /// delegate: get delegated voting power
+    pub fn get_delegated_voting_power(&self, voter_id: &VoterId) -> U128String {
+        self.internal_get_delegated_vp(voter_id).into()
+    }
+
+    /// voter: includes self and delegated voting power
+    pub fn voter_total_voting_power(&self, voter_id: VoterId) -> U128String {
+        let voter = self.internal_get_voter(&voter_id);
+        voter
+            .sum_locked_vp()
+            .saturating_add(self.internal_get_delegated_vp(&voter_id))
+            .into()
+    }
+
+    /// voter: self + delegated - used voting power
     pub fn get_available_voting_power(&self, voter_id: VoterId) -> U128String {
         let voter = self.internal_get_voter(&voter_id);
         voter.available_voting_power.into()
     }
 
+    /// voter: used voting power
     pub fn get_used_voting_power(&self, voter_id: VoterId) -> U128String {
         let voter = self.internal_get_voter(&voter_id);
         voter.sum_used_votes().into()

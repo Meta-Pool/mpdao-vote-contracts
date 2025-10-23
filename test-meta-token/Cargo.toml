@@ -1,15 +1,15 @@
 [package]
 name = "test-meta-token"
 version = "0.1.2"
-edition = "2018"
+edition = "2021"
 authors = ["metapool.app <hello@metapoool.app>"]
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-near-sdk = "4.0.0"
-near-contract-standards = "4.0.0"
+near-sdk = "4.1.1"
+near-contract-standards = "4.1.1"
 uint = "0.9.3"
 
 

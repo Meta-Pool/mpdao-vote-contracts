@@ -3,10 +3,14 @@
 ![Vote Logo](media/logo.png)
 
 Implementation of a general voting system for metapool.app DAO using the mpDAO token.
+Includes getting mpDAO tokens, locking and voting.
 
-## Testing
+## Integration Testing
 
-For integration testing see the repo metapool/mpdao-vote-contracts-integration-testing
+Integration testing is in a separate repo to make use of newer near-sdk testing tools.
+
+See the repo:
+https://github.com/Meta-Pool/mpdao-vote-contracts-integration-test.git
 
 ## Contract functions
 
