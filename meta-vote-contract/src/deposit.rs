@@ -35,6 +35,14 @@ impl FungibleTokenReceiver for MetaVoteContract {
                 Err(_) => panic!("Err parsing msg for-claims"),
             };
         }
+        // if msg == "for-unlocked-claims:[['account',amount],...]"
+        // it could only be mpDAO (checked at fn distribute_for_claims)
+        if msg.len() >= 11 && &msg[..11] == "for-unlocked-claims:" {
+            match serde_json::from_str(&msg[11..]) {
+                Ok(info) => self.distribute_for_unlocked_claims(amount, &info),
+                Err(_) => panic!("Err parsing msg for-unlocked-claims"),
+            };
+        }
         // if we're receiving mpDAO
         // then it is a deposit & lock [& vote] (for sender or others)
         else if env::predecessor_account_id() == self.mpdao_token_contract_address {
@@ -134,5 +142,46 @@ impl MetaVoteContract {
             total_distributed,
             total_amount
         );
+    }
+
+    // distributes UNLOCKED mpDAO between existent voters
+    // called from ft_on_transfer when receiving mpDAO with msg prefix "for-unlocked-claims:"
+    pub(crate) fn distribute_for_unlocked_claims(
+        &mut self,
+        total_amount: u128,
+        distribute_info: &Vec<(String, u64)>,
+    ) {
+        let mut total_distributed = 0_u128;
+        let token_address = env::predecessor_account_id();
+
+        // Only mpDAO can be used for unlocked claims
+        require!(
+            token_address == self.mpdao_token_contract_address,
+            "Unlocked claims must be distributed with mpDAO token"
+        );
+
+        for item in distribute_info {
+            // item.1 is integer mpDAO, convert to 6 decimals
+            let amount = item.1 as u128 * 1_000_000u128;
+            assert!(amount > 0, "Amount must be greater than 0");
+
+            let existing = self
+                .claimable_unlocked_mpdao
+                .get(&item.0)
+                .unwrap_or_default();
+            self.claimable_unlocked_mpdao
+                .insert(&item.0, &(existing + amount));
+            total_distributed += amount;
+        }
+
+        assert!(
+            total_distributed == total_amount,
+            "total to distribute {} != total_amount sent {}",
+            total_distributed,
+            total_amount
+        );
+
+        self.total_unclaimed_unlocked_mpdao += total_distributed;
+        self.accumulated_unlocked_mpdao_distributed_for_claims += total_distributed;
     }
 }

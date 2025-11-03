@@ -267,6 +267,16 @@ impl MetaVoteContract {
         );
     }
 
+    pub(crate) fn add_claimable_unlocked_mpdao(&mut self, account: &String, amount: u128) {
+        assert!(amount > 0);
+        Self::add_claimable(
+            &mut self.claimable_unlocked_mpdao,
+            &mut self.total_unclaimed_unlocked_mpdao,
+            account,
+            amount,
+        );
+    }
+
     pub(crate) fn remove_claimable_mpdao(&mut self, account: &String, amount: u128) {
         Self::remove_claimable(
             &mut self.claimable_mpdao,
@@ -284,6 +294,16 @@ impl MetaVoteContract {
             account,
             amount,
             "stNEAR",
+        );
+    }
+
+    pub(crate) fn remove_claimable_unlocked_mpdao(&mut self, account: &String, amount: u128) {
+        Self::remove_claimable(
+            &mut self.claimable_unlocked_mpdao,
+            &mut self.total_unclaimed_unlocked_mpdao,
+            account,
+            amount,
+            "unlocked mpDAO",
         );
     }
 
@@ -322,5 +342,17 @@ impl MetaVoteContract {
             &beneficiary_id,
             &mut beneficiary_voter,
         );
+    }
+
+    pub(crate) fn claim_unlocked_mpdao_internal(
+        &mut self,
+        voter_id: &String,
+        receiver_id: &AccountId,
+        amount: u128,
+    ) -> Promise {
+        // remove claim from unlocked bucket
+        self.remove_claimable_unlocked_mpdao(voter_id, amount);
+        // transfer to destination
+        self.transfer_claimable_unlocked_mpdao_to_receiver(voter_id, receiver_id, amount)
     }
 }

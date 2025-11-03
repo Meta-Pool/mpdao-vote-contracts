@@ -45,10 +45,15 @@ pub struct MetaVoteContract {
     pub mpdao_token_contract_address: AccountId, // governance tokens
     pub total_voting_power: u128,
 
-    // mpdao as rewards
+    // mpdao as locked 🔒 rewards
     pub claimable_mpdao: UnorderedMap<String, u128>,
     pub accumulated_mpdao_distributed_for_claims: u128, // accumulated total mpDAO distributed
     pub total_unclaimed_mpdao: u128,                    // currently unclaimed mpDAO
+
+    // MPDAO as unlocked ⛓️‍💥 rewards
+    pub claimable_unlocked_mpdao: UnorderedMap<String, u128>,
+    pub accumulated_unlocked_mpdao_distributed_for_claims: u128,
+    pub total_unclaimed_unlocked_mpdao: u128,
 
     // stNear as rewards
     pub stnear_token_contract_address: AccountId,
@@ -121,6 +126,10 @@ impl MetaVoteContract {
             accumulated_mpdao_distributed_for_claims: 0,
             total_unclaimed_mpdao: 0,
             claimable_mpdao: UnorderedMap::new(StorageKey::Claimable),
+            // unlocked mpdao (independent from locked mpdao and stNEAR)
+            claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlocked),
+            accumulated_unlocked_mpdao_distributed_for_claims: 0,
+            total_unclaimed_unlocked_mpdao: 0,
             stnear_token_contract_address,
             claimable_stnear: UnorderedMap::new(StorageKey::ClaimableStNear),
             accum_distributed_stnear_for_claims: 0,
@@ -247,6 +256,16 @@ impl MetaVoteContract {
         )
         //self.remove_claimable_stnear(&voter_id, amount);
         //self.transfer_claimable_stnear_to_receiver(&voter_id, &receiver, amount)
+    }
+
+    // claim UNLOCKED mpDAO (no lock)
+    pub fn claim_unlocked_mpdao(&mut self, amount: U128String) -> Promise {
+        let amount = amount.0;
+        self.claim_unlocked_mpdao_internal(
+            &env::predecessor_account_id().to_string(),
+            &env::predecessor_account_id(),
+            amount,
+        )
     }
 
     // *************
