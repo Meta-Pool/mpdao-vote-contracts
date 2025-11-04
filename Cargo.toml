@@ -5,7 +5,6 @@ resolver = "2"
 
 [patch.crates-io]
 parity-secp256k1 = { git = 'https://github.com/paritytech/rust-secp256k1.git' }
-indexmap = { git = "https://github.com/indexmap-rs/indexmap", tag = "2.11.0" }
 
 [profile.release]
 codegen-units = 1
