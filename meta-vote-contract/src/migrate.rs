@@ -15,10 +15,15 @@ pub struct OldState {
     pub mpdao_token_contract_address: AccountId, // governance tokens
     pub total_voting_power: u128,
 
-    // mpdao as rewards
+    // mpdao as locked 🔒 rewards
     pub claimable_mpdao: UnorderedMap<VoterId, u128>,
     pub accumulated_mpdao_distributed_for_claims: u128, // accumulated total mpDAO distributed
     pub total_unclaimed_mpdao: u128,                    // currently unclaimed mpDAO
+
+    // MPDAO as unlocked ⛓️‍💥 rewards
+    pub claimable_unlocked_mpdao: UnorderedMap<String, u128>,
+    pub accumulated_unlocked_mpdao_distributed_for_claims: u128,
+    pub total_unclaimed_unlocked_mpdao: u128,
 
     // stNear as rewards
     pub stnear_token_contract_address: AccountId,
@@ -75,6 +80,11 @@ impl MetaVoteContract {
             claimable_mpdao: old.claimable_mpdao,
             accumulated_mpdao_distributed_for_claims: old.accumulated_mpdao_distributed_for_claims,
             total_unclaimed_mpdao: old.total_unclaimed_mpdao,
+
+            // MPDAO as unlocked rewards (new storage)
+            claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlocked),
+            accumulated_unlocked_mpdao_distributed_for_claims: 0,
+            total_unclaimed_unlocked_mpdao: 0,
 
             // stNear as rewards
             stnear_token_contract_address: old.stnear_token_contract_address,

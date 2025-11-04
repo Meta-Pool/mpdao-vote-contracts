@@ -156,4 +156,55 @@ impl MetaVoteContract {
             }
         };
     }
+
+    /// This transfer is only to claim available UNLOCKED mpDAO
+    pub(crate) fn transfer_claimable_unlocked_mpdao_to_receiver(
+        &self,
+        source_voter: &String,
+        receiver: &AccountId,
+        amount: Balance,
+    ) -> Promise {
+        ext_ft_core::ext(self.mpdao_token_contract_address.clone())
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .with_attached_deposit(1)
+            .ft_transfer(receiver.clone(), U128::from(amount), None)
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
+                    .after_transfer_unlocked_mpdao_callback(
+                        &source_voter,
+                        receiver,
+                        U128::from(amount),
+                    ),
+            )
+    }
+
+    #[private]
+    pub fn after_transfer_unlocked_mpdao_callback(
+        &mut self,
+        source_voter: &String,
+        receiver: &AccountId,
+        amount: U128,
+    ) {
+        let amount = amount.0;
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(_) => {
+                log!(
+                    "{} WITHDRAWN {} unlocked mpDAO to {}",
+                    source_voter,
+                    amount,
+                    receiver
+                );
+            }
+            PromiseResult::Failed => {
+                log!(
+                    "FAILED: {} unlocked mpDAO not transferred. Recovering {} state.",
+                    amount,
+                    source_voter
+                );
+                self.add_claimable_unlocked_mpdao(source_voter, amount);
+            }
+        };
+    }
 }
