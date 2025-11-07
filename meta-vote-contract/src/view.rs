@@ -139,6 +139,13 @@ impl MetaVoteContract {
             .into()
     }
 
+    pub fn get_claimable_unlocked_mpdao(&self, voter_id: &VoterId) -> U128String {
+        self.claimable_unlocked_mpdao
+            .get(&voter_id)
+            .unwrap_or_default()
+            .into()
+    }
+
     // get all claims
     fn internal_get_claims(
         &self,
