@@ -50,7 +50,7 @@ pub struct MetaVoteContract {
     pub accumulated_mpdao_distributed_for_claims: u128, // accumulated total mpDAO distributed
     pub total_unclaimed_mpdao: u128,                    // currently unclaimed mpDAO
 
-    // MPDAO as unlocked ⛓️‍💥 rewards
+    // MPDAO as unlocked ⛓️‍💥 rewards - added 2025-11-21 (Devconnect Buenos Aires)
     pub claimable_unlocked_mpdao: UnorderedMap<String, u128>,
     pub accumulated_unlocked_mpdao_distributed_for_claims: u128,
     pub total_unclaimed_unlocked_mpdao: u128,

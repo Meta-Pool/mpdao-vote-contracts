@@ -20,11 +20,6 @@ pub struct OldState {
     pub accumulated_mpdao_distributed_for_claims: u128, // accumulated total mpDAO distributed
     pub total_unclaimed_mpdao: u128,                    // currently unclaimed mpDAO
 
-    // MPDAO as unlocked ⛓️‍💥 rewards
-    pub claimable_unlocked_mpdao: UnorderedMap<String, u128>,
-    pub accumulated_unlocked_mpdao_distributed_for_claims: u128,
-    pub total_unclaimed_unlocked_mpdao: u128,
-
     // stNear as rewards
     pub stnear_token_contract_address: AccountId,
     pub claimable_stnear: UnorderedMap<VoterId, u128>,
@@ -53,6 +48,10 @@ pub struct OldState {
 
     // timestamp storage with hashed keys - added 2025-08-26
     pub timestamp_storage: UnorderedMap<CryptoHash, u64>,
+
+    // token info & mpdao_prices - added 2025-10-5
+    pub token_info: UnorderedMap<AccountId, TokenInfo>,
+    pub mpdao_prices: UnorderedMap<AccountId, MpdaoPrice>,
 }
 
 #[near_bindgen]
@@ -81,6 +80,7 @@ impl MetaVoteContract {
             accumulated_mpdao_distributed_for_claims: old.accumulated_mpdao_distributed_for_claims,
             total_unclaimed_mpdao: old.total_unclaimed_mpdao,
 
+            // new in this version
             // MPDAO as unlocked rewards (new storage)
             claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlocked),
             accumulated_unlocked_mpdao_distributed_for_claims: 0,
@@ -112,9 +112,8 @@ impl MetaVoteContract {
 
             timestamp_storage: old.timestamp_storage,
 
-            // new in this version
-            token_info: UnorderedMap::new(StorageKey::TokenInfo),
-            mpdao_prices: UnorderedMap::new(StorageKey::MpdaoPrices),
+            token_info: old.token_info,
+            mpdao_prices: old.mpdao_prices,
         }
     }
 }
