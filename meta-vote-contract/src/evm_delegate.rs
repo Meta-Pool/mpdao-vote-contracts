@@ -97,6 +97,7 @@ impl MetaVoteContract {
         //     amount.0,
         // )
     }
+
     #[payable]
     pub fn delegated_claim_and_bond_mpdao(
         &mut self,
@@ -113,6 +114,22 @@ impl MetaVoteContract {
             amount.0,
             locking_period,
         );
+    }
+
+    #[payable]
+    pub fn delegated_claim_unlocked_mpdao(
+        &mut self,
+        evm_address: EvmAddress,
+        amount: U128String
+    ) -> Promise {
+        assert_one_yocto();
+        // verify delegation and compose the pseudo near account
+        let pseudo_account = self.verify_delegate(&evm_address);
+        self.claim_unlocked_mpdao_internal(
+            &pseudo_account,
+            &env::predecessor_account_id(),
+            amount.0,
+        )
     }
 
     // local fn: verify delegation and compose pseudo account
