@@ -120,7 +120,7 @@ impl MetaVoteContract {
     pub fn delegated_claim_unlocked_mpdao(
         &mut self,
         evm_address: EvmAddress,
-        amount: U128String
+        amount: U128String,
     ) -> Promise {
         assert_one_yocto();
         // verify delegation and compose the pseudo near account
