@@ -37,7 +37,7 @@ impl FungibleTokenReceiver for MetaVoteContract {
         }
         // if msg == "for-unlocked-claims:[['account',amount],...]"
         // it could only be mpDAO (checked at fn distribute_for_claims)
-        if msg.len() >= 20 && &msg[..20] == "for-unlocked-claims:" {
+        else if msg.len() >= 20 && &msg[..20] == "for-unlocked-claims:" {
             match serde_json::from_str(&msg[20..]) {
                 Ok(info) => self.distribute_for_unlocked_claims(amount, &info),
                 Err(_) => panic!("Err parsing msg for-unlocked-claims"),
