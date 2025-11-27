@@ -80,12 +80,6 @@ impl MetaVoteContract {
             accumulated_mpdao_distributed_for_claims: old.accumulated_mpdao_distributed_for_claims,
             total_unclaimed_mpdao: old.total_unclaimed_mpdao,
 
-            // new in this version
-            // MPDAO as unlocked rewards (new storage)
-            claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlocked),
-            accumulated_unlocked_mpdao_distributed_for_claims: 0,
-            total_unclaimed_unlocked_mpdao: 0,
-
             // stNear as rewards
             stnear_token_contract_address: old.stnear_token_contract_address,
             claimable_stnear: old.claimable_stnear,
@@ -114,6 +108,12 @@ impl MetaVoteContract {
 
             token_info: old.token_info,
             mpdao_prices: old.mpdao_prices,
+
+            // new in this version (2025-11-27)
+            // MPDAO as unlocked rewards (new storage)
+            claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlocked),
+            accumulated_unlocked_mpdao_distributed_for_claims: 0,
+            total_unclaimed_unlocked_mpdao: 0,
         }
     }
 }
