@@ -111,7 +111,7 @@ impl MetaVoteContract {
 
             // new in this version (2025-11-27)
             // MPDAO as unlocked rewards (new storage)
-            claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlocked),
+            claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlockedMpdao),
             accumulated_unlocked_mpdao_distributed_for_claims: 0,
             total_unclaimed_unlocked_mpdao: 0,
         }

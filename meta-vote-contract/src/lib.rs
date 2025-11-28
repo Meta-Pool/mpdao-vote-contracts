@@ -50,11 +50,6 @@ pub struct MetaVoteContract {
     pub accumulated_mpdao_distributed_for_claims: u128, // accumulated total mpDAO distributed
     pub total_unclaimed_mpdao: u128,                    // currently unclaimed mpDAO
 
-    // MPDAO as unlocked ⛓️‍💥 rewards - added 2025-11-21 (Devconnect Buenos Aires)
-    pub claimable_unlocked_mpdao: UnorderedMap<String, u128>,
-    pub accumulated_unlocked_mpdao_distributed_for_claims: u128,
-    pub total_unclaimed_unlocked_mpdao: u128,
-
     // stNear as rewards
     pub stnear_token_contract_address: AccountId,
     pub claimable_stnear: UnorderedMap<String, u128>,
@@ -88,6 +83,11 @@ pub struct MetaVoteContract {
     // token info & mpdao_prices - added 2025-10-5
     pub token_info: UnorderedMap<AccountId, TokenInfo>,
     pub mpdao_prices: UnorderedMap<AccountId, MpdaoPrice>,
+
+    // MPDAO as unlocked ⛓️‍💥 rewards - added 2025-11-21 (Devconnect Buenos Aires)
+    pub claimable_unlocked_mpdao: UnorderedMap<String, u128>,
+    pub accumulated_unlocked_mpdao_distributed_for_claims: u128,
+    pub total_unclaimed_unlocked_mpdao: u128,
 }
 
 #[near_bindgen]
@@ -126,10 +126,6 @@ impl MetaVoteContract {
             accumulated_mpdao_distributed_for_claims: 0,
             total_unclaimed_mpdao: 0,
             claimable_mpdao: UnorderedMap::new(StorageKey::Claimable),
-            // unlocked mpdao (independent from locked mpdao and stNEAR)
-            claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlocked),
-            accumulated_unlocked_mpdao_distributed_for_claims: 0,
-            total_unclaimed_unlocked_mpdao: 0,
             stnear_token_contract_address,
             claimable_stnear: UnorderedMap::new(StorageKey::ClaimableStNear),
             accum_distributed_stnear_for_claims: 0,
@@ -150,6 +146,10 @@ impl MetaVoteContract {
             timestamp_storage: UnorderedMap::new(StorageKey::TimestampStorage),
             token_info: UnorderedMap::new(StorageKey::TokenInfo),
             mpdao_prices: UnorderedMap::new(StorageKey::MpdaoPrices),
+            // unlocked mpdao (independent from locked mpdao and stNEAR)
+            claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlockedMpdao),
+            accumulated_unlocked_mpdao_distributed_for_claims: 0,
+            total_unclaimed_unlocked_mpdao: 0,
         }
     }
 

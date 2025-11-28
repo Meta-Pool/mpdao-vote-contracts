@@ -16,6 +16,9 @@ pub const MINUTES_IN_MS: u64 = 60 * SECONDS_IN_MS;
 pub const GAS_FOR_FT_TRANSFER: Gas = Gas(47 * TGAS);
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(11 * TGAS);
 
+/// IMPORTANT 🚨: DO NOT REORDER OR REMOVE VARIANTS.
+/// APPEND NEW VARIANTS ONLY AT THE END.
+/// Breaking this will corrupt mainnet state.
 #[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)]
 pub enum StorageKey {
     LockingPosition { hash_id: CryptoHash },
@@ -25,7 +28,6 @@ pub enum StorageKey {
     ContractVotes { hash_id: CryptoHash },
     VoterVotes { hash_id: CryptoHash },
     Claimable,
-    ClaimableUnlocked,
     ClaimableStNear,
     AirdropData,
     EvmDelegates,
@@ -34,4 +36,5 @@ pub enum StorageKey {
     TimestampStorage,
     TokenInfo,
     MpdaoPrices,
+    ClaimableUnlockedMpdao
 }
