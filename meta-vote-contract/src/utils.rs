@@ -22,6 +22,12 @@ pub fn proportional(amount: u128, numerator: u128, denominator: u128) -> u128 {
     (U256::from(amount) * U256::from(numerator) / U256::from(denominator)).as_u128()
 }
 
+#[inline]
+/// returns amount * numerator/denominator
+pub fn apply_bp(amount: u128, bp: u16) -> u128 {
+    proportional(amount, bp.into(), 10_000)
+}
+
 pub fn generate_hash_id(id: &String) -> CryptoHash {
     env::keccak256_array(id.as_bytes())
 }
@@ -31,7 +37,10 @@ pub fn pseudo_near_address(external_address: &String) -> String {
 }
 
 pub fn assert_at_least_1_mpdao(mpdao_amount: MpDAOAmount) {
-    assert!(mpdao_amount >= ONE_MPDAO, "amount should be at least 1 mpDAO"); // at least 1 mpDAO
+    assert!(
+        mpdao_amount >= ONE_MPDAO,
+        "amount should be at least 1 mpDAO"
+    ); // at least 1 mpDAO
 }
 
 /// Voting power is proportional to unbond_period
@@ -44,4 +53,3 @@ pub fn calculate_voting_power(mpdao_amount: MpDAOAmount, unbond_days: Days) -> u
     assert!(unbond_days < 3600); // put a limit to unbond_days
     proportional(base_vp, unbond_days.into(), 60) // apply multiplier
 }
-
