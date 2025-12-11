@@ -555,18 +555,81 @@ impl MetaVoteContract {
     // * Voting *
     // **********
 
+    /// Vote or delegate voting power to a contract/proposal or to another voter.
+    ///
+    /// # Delegation Rules
+    ///
+    /// To prevent recursive delegation chains, the following rules are enforced:
+    /// - If someone has delegated TO you, you CANNOT delegate further (prevents A→B→C chains)
+    /// - You CANNOT delegate to someone who has already delegated to others (prevents A→B→C from target side)
+    /// - You CANNOT delegate to yourself
+    ///
+    /// # What IS Allowed
+    ///
+    /// - ✅ Multiple delegations from the same user (A→B and A→C)
+    /// - ✅ Multiple delegators to the same representative (A→B and C→B)
+    /// - ✅ Voting and delegating (A votes + A→B)
+    /// - ✅ Delegating again after previous delegation (A→B, then later A→C)
+    ///
+    /// # Arguments
+    ///
+    /// * `voting_power` - Amount of voting power to allocate
+    /// * `contract_address` - Target contract address (use "delegated" for delegation)
+    /// * `votable_object_id` - Object/proposal ID to vote for (or delegate account ID)
     pub fn vote(
         &mut self,
         voting_power: U128String,
         contract_address: ContractAddress,
         votable_object_id: VotableObjId,
     ) {
+        let voter_id = env::predecessor_account_id().as_str().to_string();
         self.internal_vote(
-            &env::predecessor_account_id().as_str().to_string(),
+            &voter_id,
             voting_power,
             contract_address,
             votable_object_id,
         )
+    }
+
+    /// Validates delegation rules to prevent recursive delegation chains.
+    /// 
+    /// This function enforces three critical checks:
+    /// 1. If someone has delegated TO the voter, they cannot delegate further (prevents A→B→C)
+    /// 2. Cannot delegate to yourself
+    /// 3. Cannot delegate to someone who has already delegated to others (prevents A→B→C from target side)
+    fn validate_delegation_rules(
+        &self,
+        voter_id: &String,
+        contract_address: &ContractAddress,
+        votable_object_id: &VotableObjId,
+    ) {
+        // Only validate if this is a delegation operation
+        if contract_address != DELEGATED_CONTRACT_CODE {
+            return;
+        }
+
+        // Check 1: If someone has delegated TO caller, caller cannot delegate further
+        // (This prevents chains like A→B→C)
+        if self.internal_get_delegated_vp(voter_id) > 0 {
+            panic!("Cannot delegate if you have received delegated votes.");
+        }
+
+        // Check 2: Prevent self-delegation
+        if votable_object_id == voter_id {
+            panic!("Cannot delegate to yourself.");
+        }
+
+        let delegatee_voter = self.internal_get_voter(votable_object_id);
+
+        // Check 3: Target has delegated TO someone else
+        // (This prevents chains like A→B→C from the target side)
+        if delegatee_voter
+            .vote_positions
+            .get(&DELEGATED_CONTRACT_CODE.to_string())
+            .is_some()
+        {
+            panic!("Cannot delegate votes to someone who is also a delegator.");
+        }
     }
 
     fn internal_vote(
@@ -576,6 +639,9 @@ impl MetaVoteContract {
         contract_address: ContractAddress,
         votable_object_id: VotableObjId,
     ) {
+        // Validate delegation rules if this is a delegation operation
+        self.validate_delegation_rules(voter_id, &contract_address, &votable_object_id);
+
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let voting_power = u128::from(voting_power);
 
@@ -672,6 +738,10 @@ impl MetaVoteContract {
         if votes < voting_power {
             // Increase votes.
             let additional_votes = voting_power - votes;
+            
+            // Validate delegation rules when increasing delegation votes
+            self.validate_delegation_rules(&voter_id, &contract_address, &votable_object_id);
+            
             assert!(
                 voter.available_voting_power >= additional_votes,
                 "Not enough free voting power to unlock! You have {}, required {}.",
