@@ -768,8 +768,8 @@ impl MetaVoteContract {
             );
 
             if contract_address == DELEGATED_CONTRACT_CODE {
-                // delegate votes
-                self.internal_add_delegated_voting_power(votable_object_id, voting_power);
+                // When increasing delegation, add only the additional votes to the delegate
+                self.internal_add_delegated_voting_power(votable_object_id, additional_votes);
             }
         } else {
             // Decrease votes.
@@ -796,7 +796,7 @@ impl MetaVoteContract {
 
             if contract_address == DELEGATED_CONTRACT_CODE {
                 // delegate votes
-                self.internal_remove_delegated_voting_power(votable_object_id, voting_power);
+                self.internal_remove_delegated_voting_power(votable_object_id, remove_votes);
             }
         }
         votes_for_address.insert(&votable_object_id, &votes);
@@ -804,9 +804,6 @@ impl MetaVoteContract {
             .vote_positions
             .insert(&contract_address, &votes_for_address);
         self.voters.insert(&voter_id, &voter);
-
-        let voter = self.voters.get_mut(&voter_id).unwrap();
-        self.adjust_voter_voting_power(&voter_id, voter);
     }
 
     fn internal_remove_voting_position(
