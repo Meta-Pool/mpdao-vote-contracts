@@ -697,7 +697,6 @@ impl MetaVoteContract {
             .insert(&contract_address, &votes_for_address);
 
         if contract_address == DELEGATED_CONTRACT_CODE {
-            require!(votable_object_id != voter_id, "Cannot self-delegate votes.");
             // delegate votes
             self.internal_add_delegated_voting_power(votable_object_id, voting_power);
         }
@@ -767,6 +766,11 @@ impl MetaVoteContract {
                 &contract_address,
                 &votable_object_id,
             );
+
+            if contract_address == DELEGATED_CONTRACT_CODE {
+                // delegate votes
+                self.internal_add_delegated_voting_power(votable_object_id, voting_power);
+            }
         } else {
             // Decrease votes.
             let remove_votes = votes - voting_power;
@@ -789,12 +793,20 @@ impl MetaVoteContract {
                 &contract_address,
                 &votable_object_id,
             );
+
+            if contract_address == DELEGATED_CONTRACT_CODE {
+                // delegate votes
+                self.internal_remove_delegated_voting_power(votable_object_id, voting_power);
+            }
         }
         votes_for_address.insert(&votable_object_id, &votes);
         voter
             .vote_positions
             .insert(&contract_address, &votes_for_address);
         self.voters.insert(&voter_id, &voter);
+
+        let voter = self.voters.get_mut(&voter_id).unwrap();
+        self.adjust_voter_voting_power(&voter_id, voter);
     }
 
     fn internal_remove_voting_position(
