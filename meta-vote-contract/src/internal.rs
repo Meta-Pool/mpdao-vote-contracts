@@ -1,3 +1,5 @@
+use near_sdk::PromiseOrValue;
+
 use crate::*;
 
 pub const DELEGATED_CONTRACT_CODE: &str = "delegated";
@@ -349,10 +351,23 @@ impl MetaVoteContract {
         voter_id: &String,
         receiver_id: &AccountId,
         amount: u128,
-    ) -> Promise {
+        optional_unbond_days: Option<u16>,
+    ) -> PromiseOrValue<u128> {
         // remove claim from unlocked bucket
         self.remove_claimable_unlocked_mpdao(voter_id, amount);
-        // transfer to destination
-        self.transfer_claimable_unlocked_mpdao_to_receiver(voter_id, receiver_id, amount)
+        let unbond_days = optional_unbond_days.unwrap_or(0);
+        if unbond_days > 0 {
+            self.assert_min_deposit_amount(amount);
+            // get beneficiary voter
+            let mut beneficiary_voter = self.internal_get_voter(&voter_id);
+            // create/update locking position
+            self.deposit_locking_position(amount, unbond_days, &voter_id, &mut beneficiary_voter);
+            // return 0
+            PromiseOrValue::Value(0)
+        } else {
+            // transfer to destination, return promise
+            self.transfer_claimable_unlocked_mpdao_to_receiver(voter_id, receiver_id, amount)
+                .into()
+        }
     }
 }

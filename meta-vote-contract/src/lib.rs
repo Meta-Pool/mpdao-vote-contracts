@@ -11,7 +11,7 @@ use near_sdk::{
     collections::{unordered_map::UnorderedMap, Vector},
     env, log, near_bindgen, require,
     store::LookupMap,
-    AccountId, Balance, CryptoHash, PanicOnDefault, Promise, ONE_NEAR,
+    AccountId, Balance, CryptoHash, PanicOnDefault, Promise, PromiseOrValue, ONE_NEAR,
 };
 use types::*;
 use voter::Voter;
@@ -258,13 +258,18 @@ impl MetaVoteContract {
         //self.transfer_claimable_stnear_to_receiver(&voter_id, &receiver, amount)
     }
 
-    // claim UNLOCKED mpDAO (no lock)
-    pub fn claim_unlocked_mpdao(&mut self, amount: U128String) -> Promise {
+    // claim UNLOCKED mpDAO (no lock if no optional_unbond_days or optional_unbond_days=0)
+    pub fn claim_unlocked_mpdao(
+        &mut self,
+        amount: U128String,
+        optional_unbond_days: Option<u16>,
+    ) -> PromiseOrValue<u128> {
         let amount = amount.0;
         self.claim_unlocked_mpdao_internal(
             &env::predecessor_account_id().to_string(),
             &env::predecessor_account_id(),
             amount,
+            optional_unbond_days,
         )
     }
 

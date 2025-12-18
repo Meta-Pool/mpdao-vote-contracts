@@ -189,7 +189,11 @@ impl MetaVoteContract {
     pub fn get_mpip_voting_power(&self, voter_id: VoterId) -> U128String {
         let voter = self.internal_get_voter(&voter_id);
         // if the user has voted in contract_id == DELEGATED_CONTRACT_CODE, return zero
-        if voter.vote_positions.get(&DELEGATED_CONTRACT_CODE.to_string()).is_some() {
+        if voter
+            .vote_positions
+            .get(&DELEGATED_CONTRACT_CODE.to_string())
+            .is_some()
+        {
             return 0.into();
         }
         voter.sum_locked_vp().into()

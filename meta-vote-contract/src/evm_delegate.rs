@@ -1,5 +1,5 @@
 use crate::*;
-use near_sdk::{assert_one_yocto, near_bindgen};
+use near_sdk::{assert_one_yocto, near_bindgen, PromiseOrValue};
 
 #[near_bindgen]
 impl MetaVoteContract {
@@ -121,7 +121,8 @@ impl MetaVoteContract {
         &mut self,
         evm_address: EvmAddress,
         amount: U128String,
-    ) -> Promise {
+        optional_unbond_days: Option<u16>,
+    ) -> PromiseOrValue<u128> {
         assert_one_yocto();
         // verify delegation and compose the pseudo near account
         let pseudo_account = self.verify_delegate(&evm_address);
@@ -129,6 +130,7 @@ impl MetaVoteContract {
             &pseudo_account,
             &env::predecessor_account_id(),
             amount.0,
+            optional_unbond_days,
         )
     }
 
