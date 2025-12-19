@@ -769,7 +769,7 @@ impl MetaVoteContract {
 
             if contract_address == DELEGATED_CONTRACT_CODE {
                 // When increasing delegation, add only the additional votes to the delegate
-                self.internal_add_delegated_voting_power(votable_object_id, additional_votes);
+                self.internal_add_delegated_voting_power(&votable_object_id, additional_votes);
             }
         } else {
             // Decrease votes.
@@ -796,7 +796,7 @@ impl MetaVoteContract {
 
             if contract_address == DELEGATED_CONTRACT_CODE {
                 // delegate votes
-                self.internal_remove_delegated_voting_power(votable_object_id, remove_votes);
+                self.internal_remove_delegated_voting_power(&votable_object_id, remove_votes);
             }
         }
         votes_for_address.insert(&votable_object_id, &votes);
