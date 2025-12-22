@@ -567,7 +567,7 @@ impl MetaVoteContract {
     /// # What IS Allowed
     ///
     /// - ✅ Multiple delegations from the same user (A→B and A→C)
-    /// - ✅ Multiple delegators to the same representative (A→B and C→B)
+    /// - ✅ More than one delegator to the same delegate (A→B and C→B)
     /// - ✅ Voting and delegating (A votes + A→B)
     /// - ✅ Delegating again after previous delegation (A→B, then later A→C)
     ///
@@ -583,16 +583,11 @@ impl MetaVoteContract {
         votable_object_id: VotableObjId,
     ) {
         let voter_id = env::predecessor_account_id().as_str().to_string();
-        self.internal_vote(
-            &voter_id,
-            voting_power,
-            contract_address,
-            votable_object_id,
-        )
+        self.internal_vote(&voter_id, voting_power, contract_address, votable_object_id)
     }
 
     /// Validates delegation rules to prevent recursive delegation chains.
-    /// 
+    ///
     /// This function enforces three critical checks:
     /// 1. If someone has delegated TO the voter, they cannot delegate further (prevents A→B→C)
     /// 2. Cannot delegate to yourself
@@ -737,10 +732,10 @@ impl MetaVoteContract {
         if votes < voting_power {
             // Increase votes.
             let additional_votes = voting_power - votes;
-            
+
             // Validate delegation rules when increasing delegation votes
             self.validate_delegation_rules(&voter_id, &contract_address, &votable_object_id);
-            
+
             assert!(
                 voter.available_voting_power >= additional_votes,
                 "Not enough free voting power to unlock! You have {}, required {}.",
@@ -795,7 +790,7 @@ impl MetaVoteContract {
             );
 
             if contract_address == DELEGATED_CONTRACT_CODE {
-                // delegate votes
+                // remove delegated vp
                 self.internal_remove_delegated_voting_power(&votable_object_id, remove_votes);
             }
         }
