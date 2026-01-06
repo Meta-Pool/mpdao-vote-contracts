@@ -382,12 +382,14 @@ impl MetaVoteContract {
         locking_position.locking_period = new_locking_period;
         locking_position.voting_power = new_voting_power;
 
-        // update available voting power
-        self.update_vp_available(&voter_id, &mut voter);
-
         // save
         voter.locking_positions.replace(index, &locking_position);
+        // after saving position, update available voting power
+        self.update_vp_available(&voter_id, &mut voter);
+
+        // save voter
         self.voters.insert(&voter_id, &voter);
+
     }
 
     // ***********
