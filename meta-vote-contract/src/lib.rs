@@ -939,9 +939,11 @@ impl MetaVoteContract {
         // Check if the voter exists in the registry
         if let Some(voter) = self.voters.get(&voter_id.to_string()) {
             // Iterate through all vote positions for this voter
+            let to_update_contract_addresses = ["metastaking.app", DELEGATED_CONTRACT_CODE];
             for contract_address in voter.vote_positions.keys_as_vector().iter() {
                 // Only refresh if the vote is for validators (contract_address is 'metastaking.app')
-                if contract_address == "metastaking.app" {
+                // or for delegated votes
+                if  to_update_contract_addresses.contains(&contract_address.as_str()) {
                     if let Some(votes_for_address) = voter.vote_positions.get(&contract_address) {
                         // Iterate each votable object ID
                         for votable_object_id in votes_for_address.keys_as_vector().iter() {
