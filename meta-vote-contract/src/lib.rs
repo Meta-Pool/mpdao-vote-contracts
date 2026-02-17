@@ -389,7 +389,6 @@ impl MetaVoteContract {
 
         // save voter
         self.voters.insert(&voter_id, &voter);
-
     }
 
     // ***********
@@ -857,7 +856,7 @@ impl MetaVoteContract {
             &votable_object_id,
             contract_address.as_str()
         );
-        self.internal_unvote(&voter_id, &contract_address, &votable_object_id)
+        self.internal_unvote(&voter_id, &contract_address, &votable_object_id, false)
     }
 
     fn internal_unvote(
@@ -865,10 +864,13 @@ impl MetaVoteContract {
         voter_id: &String,
         contract_address: &ContractAddress,
         votable_object_id: &VotableObjId,
+        bypass_delegation_restriction: bool,
     ) {
         // verify if unvoting delegated vote: must wait at least 7 days since last refresh
-        if contract_address == DELEGATED_CONTRACT_CODE {
-            let vote_timestamp = self.get_vote_timestamp(voter_id, contract_address, votable_object_id);
+        // (unless bypassing the restriction, e.g., for operator cleanup of stale votes)
+        if contract_address == DELEGATED_CONTRACT_CODE && !bypass_delegation_restriction {
+            let vote_timestamp =
+                self.get_vote_timestamp(voter_id, contract_address, votable_object_id);
             let time_since_last_refresh = env::block_timestamp_ms() - vote_timestamp;
             require!(
                 time_since_last_refresh >= crate::timestamp_utils::SEVEN_DAYS_MS,
@@ -911,7 +913,7 @@ impl MetaVoteContract {
         let mut count = 0;
         for r in list_to_remove {
             if self.verify_vote_is_stale(&r.voter_id, &r.contract_address, &r.votable_object_id) {
-                self.internal_unvote(&r.voter_id, &r.contract_address, &r.votable_object_id);
+                self.internal_unvote(&r.voter_id, &r.contract_address, &r.votable_object_id, true);
                 count += 1;
             } else {
                 log!(
@@ -943,7 +945,7 @@ impl MetaVoteContract {
             for contract_address in voter.vote_positions.keys_as_vector().iter() {
                 // Only refresh if the vote is for validators (contract_address is 'metastaking.app')
                 // or for delegated votes
-                if  to_update_contract_addresses.contains(&contract_address.as_str()) {
+                if to_update_contract_addresses.contains(&contract_address.as_str()) {
                     if let Some(votes_for_address) = voter.vote_positions.get(&contract_address) {
                         // Iterate each votable object ID
                         for votable_object_id in votes_for_address.keys_as_vector().iter() {

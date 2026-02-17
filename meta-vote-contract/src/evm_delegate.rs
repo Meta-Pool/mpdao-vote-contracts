@@ -184,7 +184,12 @@ impl MetaVoteContract {
             contract_address.as_str(),
             pseudo_account
         );
-        self.internal_unvote(&pseudo_account, &contract_address, &votable_object_id)
+        self.internal_unvote(
+            &pseudo_account,
+            &contract_address,
+            &votable_object_id,
+            false,
+        )
     }
 
     #[payable]
