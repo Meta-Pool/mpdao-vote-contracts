@@ -871,7 +871,7 @@ impl MetaVoteContract {
         if contract_address == DELEGATED_CONTRACT_CODE && !bypass_delegation_restriction {
             let vote_timestamp =
                 self.get_vote_timestamp(voter_id, contract_address, votable_object_id);
-            let time_since_last_refresh = env::block_timestamp_ms() - vote_timestamp;
+            let time_since_last_refresh = env::block_timestamp_ms().saturating_sub(vote_timestamp);
             require!(
                 time_since_last_refresh >= crate::timestamp_utils::SEVEN_DAYS_MS,
                 format!(
