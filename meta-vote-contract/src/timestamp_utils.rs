@@ -2,6 +2,8 @@ use crate::types::{ContractAddress, VotableObjId};
 use near_sdk::{env, CryptoHash};
 
 // Constants for timestamp calculations
+/// 7 days in milliseconds
+pub(crate) const SEVEN_DAYS_MS: u64 = 7 * 24 * 60 * 60 * 1000;
 /// 60 days in milliseconds
 const SIXTY_DAYS_MS: u64 = 60 * 24 * 60 * 60 * 1000;
 /// timestamp implementation date Aug 1st, 2025
