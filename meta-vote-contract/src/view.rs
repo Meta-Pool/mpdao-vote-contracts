@@ -185,18 +185,14 @@ impl MetaVoteContract {
         voter.sum_unlocking().into()
     }
 
-    /// voter: MPIP voting power. Zero if this user has delegated some voting power
+    /// MPIP voting power: returns the voter's available voting power for MPIPs.
+    /// This is the voter's self voting power minus any voting power they have delegated to others.
+    /// If a voter has delegated only 30% of their VP, they can still use the remaining 70% to vote on MPIPs.
     pub fn get_mpip_voting_power(&self, voter_id: VoterId) -> U128String {
         let voter = self.internal_get_voter(&voter_id);
-        // if the user has voted in contract_id == DELEGATED_CONTRACT_CODE, return zero
-        if voter
-            .vote_positions
-            .get(&DELEGATED_CONTRACT_CODE.to_string())
-            .is_some()
-        {
-            return 0.into();
-        }
-        voter.sum_locked_vp().into()
+        let self_vp = voter.sum_locked_vp();
+        let delegated_away_vp = voter.sum_delegated_away_vp();
+        self_vp.saturating_sub(delegated_away_vp).into()
     }
 
     /// self-voting power, does not include delegated voting power
@@ -205,7 +201,13 @@ impl MetaVoteContract {
         voter.sum_locked_vp().into()
     }
 
-    /// delegate: get delegated voting power
+    /// Get the amount of voting power this voter has delegated away to others
+    pub fn get_delegated_away_voting_power(&self, voter_id: VoterId) -> U128String {
+        let voter = self.internal_get_voter(&voter_id);
+        voter.sum_delegated_away_vp().into()
+    }
+
+    /// delegate: get delegated voting power (voting power received from others)
     pub fn get_delegated_voting_power(&self, voter_id: &VoterId) -> U128String {
         self.internal_get_delegated_vp(voter_id).into()
     }

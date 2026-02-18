@@ -87,6 +87,14 @@ impl Voter {
             .sum()
     }
 
+    /// Sum the voting power that this voter has delegated away to others
+    pub(crate) fn sum_delegated_away_vp(&self) -> u128 {
+        self.vote_positions
+            .get(&crate::internal::DELEGATED_CONTRACT_CODE.to_string())
+            .map(|map| map.values().sum::<u128>())
+            .unwrap_or(0)
+    }
+
     pub(crate) fn find_locked_position(&self, unbond_days: Days) -> Option<u64> {
         let mut index = 0_u64;
         for locking_position in self.locking_positions.iter() {
