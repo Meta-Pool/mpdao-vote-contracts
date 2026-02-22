@@ -1,4 +1,3 @@
-use crate::internal::DELEGATED_CONTRACT_CODE;
 use crate::types::*;
 use crate::{voter::VoterJSON, MetaVoteContract, MetaVoteContractExt, StorageKey};
 use near_sdk::{

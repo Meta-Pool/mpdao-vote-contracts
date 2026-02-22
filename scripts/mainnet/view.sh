@@ -3,7 +3,7 @@ __dir=$(dirname "$0")
 . $__dir/mainnet-set-vars.sh
 . $__dir/declare_get_mpdao_balance.sh
 
-near view $METAVOTE_CONTRACT_ADDRESS get_mpip_voting_power '{"voter_id":"luciotato.near"}'
+near view $METAVOTE_CONTRACT_ADDRESS get_voter_info '{"voter_id":"'$1'"}'
 exit 0
 
 # near view $METAVOTE_CONTRACT_ADDRESS get_contract_info
