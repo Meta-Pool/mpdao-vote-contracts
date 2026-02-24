@@ -185,13 +185,18 @@ impl MetaVoteContract {
     }
 
     /// MPIP voting power: returns the voter's available voting power for MPIPs.
-    /// This is the voter's self voting power minus any voting power they have delegated to others.
-    /// If a voter has delegated only 30% of their VP, they can still use the remaining 70% to vote on MPIPs.
+    /// This includes the voter's self voting power, plus any delegated voting power received from others,
+    /// minus any voting power they have delegated away to others.
+    /// Note: delegates cannot delegate away their VP, so either internal_get_delegated_vp or delegated_away_vp will be zero.
     pub fn get_mpip_voting_power(&self, voter_id: VoterId) -> U128String {
         let voter = self.internal_get_voter(&voter_id);
         let self_vp = voter.sum_locked_vp();
+        let delegated_vp = self.internal_get_delegated_vp(&voter_id);
         let delegated_away_vp = voter.sum_delegated_away_vp();
-        self_vp.saturating_sub(delegated_away_vp).into()
+        self_vp
+            .saturating_add(delegated_vp)
+            .saturating_sub(delegated_away_vp)
+            .into()
     }
 
     /// self-voting power, does not include delegated voting power
