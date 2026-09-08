@@ -835,17 +835,19 @@ impl MetaVoteContract {
         // Remove timestamp for this vote
         self.remove_vote_timestamp(voter_id, contract_address, votable_object_id);
 
-        if contract_address == DELEGATED_CONTRACT_CODE {
-            // remove delegated votes
-            self.internal_remove_delegated_voting_power(votable_object_id, user_vote_for_object);
-        }
-
-        // Update Meta Vote global state unordered maps
+        // Update Meta Vote global state unordered maps FIRST.
+        // For undelegation, this must happen before adjusting the delegate so
+        // internal_get_delegated_vp reflects the reduced amount.
         self.state_internal_decrease_total_votes_for_address(
             user_vote_for_object,
             &contract_address,
             &votable_object_id,
         );
+
+        if contract_address == DELEGATED_CONTRACT_CODE {
+            // Claw back excess votes the delegate may have already cast with this VP.
+            self.internal_remove_delegated_voting_power(votable_object_id, user_vote_for_object);
+        }
     }
 
     pub fn unvote(&mut self, contract_address: ContractAddress, votable_object_id: VotableObjId) {

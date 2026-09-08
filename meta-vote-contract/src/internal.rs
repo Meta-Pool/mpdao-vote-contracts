@@ -52,6 +52,16 @@ impl MetaVoteContract {
         self.voters.insert(&delegate_id, &delegate);
     }
 
+    /// Called after a delegator removes/reduces delegation to `delegate_id`.
+    ///
+    /// IMPORTANT: the caller must already have decreased the global delegated vote
+    /// totals (`self.votes["delegated"][delegate_id]`) so `internal_get_delegated_vp`
+    /// reflects the post-undelegation amount.
+    ///
+    /// Previously this only did `available_voting_power.saturating_sub(...)`, which left
+    /// delegates over-voted when they had already cast the delegated VP on proposals/
+    /// validators. We now recompute from locked + remaining delegated and claw back
+    /// excess votes via `adjust_voter_voting_power`.
     pub(crate) fn internal_remove_delegated_voting_power(
         &mut self,
         delegate_id: &String,
@@ -59,9 +69,12 @@ impl MetaVoteContract {
     ) {
         let delegate = self.voters.get(&delegate_id);
         if let Some(mut delegate) = delegate {
-            delegate.available_voting_power =
-                delegate.available_voting_power.saturating_sub(voting_power);
-            // save delegate
+            log!(
+                "Removing {} delegated VP from {}; recomputing available and clawing back excess votes if needed",
+                voting_power,
+                delegate_id
+            );
+            self.adjust_voter_voting_power(delegate_id, &mut delegate);
             self.voters.insert(&delegate_id, &delegate);
         }
     }
@@ -100,12 +113,14 @@ impl MetaVoteContract {
     }
 
     /// Recomputes the voter's available voting power from scratch.
+    /// If used votes exceed locked + delegated capacity, removes or partially reduces
+    /// vote positions (smallest first) until used fits capacity.
     pub(crate) fn adjust_voter_voting_power(&mut self, voter_id: &String, voter: &mut Voter) {
         // HANDLE VOTING POWER ADJUSTMENT
         let mut used_voting_power = voter.sum_used_votes();
         let self_voting_power = voter.sum_locked_vp();
         let new_voting_power: u128 = self_voting_power + self.internal_get_delegated_vp(voter_id);
-        // while more votes than voting power, remove votes
+        // while more votes than voting power, remove/reduce votes
         if used_voting_power > new_voting_power {
             // get all voting positions sorted by voting power (ascending)
             let mut vote_positions_by_power = std::collections::BTreeMap::new();
@@ -124,27 +139,98 @@ impl MetaVoteContract {
                 }
             }
 
-            // remove votes starting with the smaller ones by voting power (BTreeMap is naturally sorted)
+            // remove/reduce votes starting with the smaller ones by voting power
             for (_, vote_pos) in vote_positions_by_power.iter() {
                 if used_voting_power <= new_voting_power {
                     break;
                 }
-                self.internal_remove_voting_position(
-                    voter_id,
-                    voter,
-                    &vote_pos.votable_address,
-                    &vote_pos.votable_object_id,
-                );
-                log!(
-                    "Removed vote for {} / {} of {} vp",
-                    vote_pos.votable_address,
-                    vote_pos.votable_object_id,
-                    vote_pos.voting_power
-                );
-                used_voting_power -= vote_pos.voting_power;
+                let excess = used_voting_power - new_voting_power;
+                // Delegated positions cannot be partially reduced (that path must
+                // also update the target delegate). Full-remove even if larger
+                // than excess — same as pre-partial-reduce adjust behavior.
+                if vote_pos.voting_power <= excess
+                    || vote_pos.votable_address == DELEGATED_CONTRACT_CODE
+                {
+                    // Entire position is excess — remove it.
+                    self.internal_remove_voting_position(
+                        voter_id,
+                        voter,
+                        &vote_pos.votable_address,
+                        &vote_pos.votable_object_id,
+                    );
+                    log!(
+                        "Removed vote for {} / {} of {} vp",
+                        vote_pos.votable_address,
+                        vote_pos.votable_object_id,
+                        vote_pos.voting_power
+                    );
+                    used_voting_power -= vote_pos.voting_power;
+                } else {
+                    // Keep the position but shrink it so used == capacity.
+                    // Avoids wiping a voter's entire validator vote when only
+                    // the delegated portion became invalid after undelegation.
+                    self.internal_reduce_vote_position(
+                        voter_id,
+                        voter,
+                        &vote_pos.votable_address,
+                        &vote_pos.votable_object_id,
+                        excess,
+                    );
+                    log!(
+                        "Reduced vote for {} / {} by {} vp (kept {})",
+                        vote_pos.votable_address,
+                        vote_pos.votable_object_id,
+                        excess,
+                        vote_pos.voting_power - excess
+                    );
+                    used_voting_power -= excess;
+                    break;
+                }
             }
         }
-        voter.available_voting_power = new_voting_power - used_voting_power;
+        voter.available_voting_power = new_voting_power.saturating_sub(used_voting_power);
+    }
+
+    /// Shrink an existing vote position by `remove_votes` without deleting it.
+    /// Does not bump `available_voting_power` — callers (e.g. `adjust_voter_voting_power`)
+    /// recompute available after all adjustments.
+    ///
+    /// Must not be used for `contract_address == "delegated"` (use full remove /
+    /// rebalance paths that update the delegate's available VP).
+    pub(crate) fn internal_reduce_vote_position(
+        &mut self,
+        voter_id: &String,
+        voter: &mut Voter,
+        contract_address: &ContractAddress,
+        votable_object_id: &VotableObjId,
+        remove_votes: u128,
+    ) {
+        require!(
+            contract_address != DELEGATED_CONTRACT_CODE,
+            "internal_reduce_vote_position cannot be used for delegated votes"
+        );
+        require!(remove_votes > 0, "remove_votes must be > 0");
+
+        let mut user_votes_for_app =
+            voter.get_vote_position_for_address(voter_id, contract_address);
+        let mut votes = user_votes_for_app
+            .get(votable_object_id)
+            .expect("Cannot reduce a Votable Object without votes.");
+        require!(
+            votes > remove_votes,
+            "remove_votes must be less than current votes; use full remove instead"
+        );
+        votes -= remove_votes;
+        user_votes_for_app.insert(votable_object_id, &votes);
+        voter
+            .vote_positions
+            .insert(contract_address, &user_votes_for_app);
+
+        self.state_internal_decrease_total_votes_for_address(
+            remove_votes,
+            contract_address,
+            votable_object_id,
+        );
     }
 
     /// Inner method to get or create a Voter.
