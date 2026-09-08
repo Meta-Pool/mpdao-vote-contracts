@@ -145,7 +145,12 @@ impl MetaVoteContract {
                     break;
                 }
                 let excess = used_voting_power - new_voting_power;
-                if vote_pos.voting_power <= excess {
+                // Delegated positions cannot be partially reduced (that path must
+                // also update the target delegate). Full-remove even if larger
+                // than excess — same as pre-partial-reduce adjust behavior.
+                if vote_pos.voting_power <= excess
+                    || vote_pos.votable_address == DELEGATED_CONTRACT_CODE
+                {
                     // Entire position is excess — remove it.
                     self.internal_remove_voting_position(
                         voter_id,
