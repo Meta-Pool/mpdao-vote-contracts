@@ -21,6 +21,8 @@ mod constants;
 mod deposit;
 mod evm_delegate;
 mod internal;
+#[cfg(test)]
+mod tests_extend;
 mod locking_position;
 mod migrate;
 mod timestamp_utils;
@@ -362,6 +364,15 @@ impl MetaVoteContract {
         require!(
             new_locking_period > locking_position.locking_period,
             "new auto-lock period should be greater than previous one"
+        );
+        // Same limit the deposit path enforces (locking_position.rs): without it one call
+        // could lift a position up to the generic <3600 days assert in calculate_voting_power.
+        require!(
+            new_locking_period <= self.max_unbond_period,
+            format!(
+                "Unbound period must be between {} and {} days",
+                self.min_unbond_period, self.max_unbond_period
+            )
         );
 
         log!(
