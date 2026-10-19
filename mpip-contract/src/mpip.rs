@@ -59,6 +59,7 @@ pub struct Mpip {
 impl Mpip {
     pub(crate) fn new(
         id: MpipId,
+        creator_id: AccountId,
         title: String,
         short_description: String,
         body: String,
@@ -73,7 +74,7 @@ impl Mpip {
             // comments: "".to_string(),
             data: data,
             extra: extra,
-            creator_id: env::signer_account_id(),
+            creator_id,
             vote_end_timestamp: None,
             vote_start_timestamp: None,
             draft: true,
@@ -111,13 +112,14 @@ impl MpipContract {
     pub(crate) fn internal_create_proposal(
         &mut self,
         mpip_id: MpipId,
+        creator_id: AccountId,
         title: String,
         short_description: String,
         body: String,
         data: String,
         extra: String,
     ) -> MpipId {
-        let proposal = Mpip::new(mpip_id, title, short_description, body, data, extra);
+        let proposal = Mpip::new(mpip_id, creator_id, title, short_description, body, data, extra);
         self.proposals.insert(&mpip_id, &proposal);
         let mut proposer = self.internal_get_proposer(proposal.creator_id.clone());
         proposer.push(mpip_id);

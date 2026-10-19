@@ -21,6 +21,8 @@ mod utils;
 mod vote;
 mod vote_counting;
 mod voter;
+#[cfg(test)]
+mod tests_mpip;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -191,6 +193,11 @@ impl MpipContract {
     #[private]
     pub fn start_voting_period_callback(&mut self, mpip_id: MpipId) {
         let total_voting_power = self.internal_get_total_voting_power_from_promise();
+        // A zero total would snapshot a zero quorum and let a proposal pass with no votes
+        require!(
+            total_voting_power > 0,
+            "total voting power is zero, cannot start the voting period"
+        );
         let mut proposal = self.internal_get_proposal(&mpip_id);
         let now = get_current_epoch_millis();
         proposal.vote_start_timestamp = Some(now);
@@ -222,13 +229,21 @@ impl MpipContract {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE_VOTE)
-                    .create_proposal_callback(title, short_description, body, data, extra),
+                    .create_proposal_callback(
+                        env::predecessor_account_id(),
+                        title,
+                        short_description,
+                        body,
+                        data,
+                        extra,
+                    ),
             );
     }
 
     #[private]
     pub fn create_proposal_callback(
         &mut self,
+        creator_id: AccountId,
         title: String,
         short_description: String,
         body: String,
@@ -238,7 +253,7 @@ impl MpipContract {
         let total_v_power = self.internal_get_user_total_voting_power_from_promise();
         self.assert_proposal_threshold(total_v_power);
         let id = self.proposals.len() as MpipId;
-        self.internal_create_proposal(id, title, short_description, body, data, extra);
+        self.internal_create_proposal(id, creator_id, title, short_description, body, data, extra);
         id
     }
 
@@ -417,6 +432,12 @@ impl MpipContract {
         limit_vp: U128,
         memo: String,
     ) {
+        // Re-validate here: the checks in vote_proposal_internal ran in an earlier receipt, so
+        // two concurrent vote transactions can both pass them and would add the voter's
+        // power to the tally twice. This callback runs sequentially, so this check is atomic
+        // with the write below.
+        self.assert_proposal_is_on_voting(&mpip_id);
+        self.assert_has_not_voted(mpip_id, voter_id.clone());
         let total_v_power = self.internal_get_user_total_voting_power_from_promise();
         let mut voter = self.internal_get_voter(&voter_id);
         assert!(
