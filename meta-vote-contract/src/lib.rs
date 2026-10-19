@@ -282,6 +282,13 @@ impl MetaVoteContract {
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let mut locking_position = voter.get_position(index);
 
+        // A position can only be unlocked once. Without this guard every repeated call
+        // subtracts the same voting power from the global counter again.
+        require!(
+            locking_position.unlocking_started_at.is_none(),
+            "position should be locked in order to unlock it"
+        );
+
         let voting_power_to_remove = locking_position.voting_power;
         locking_position.unlocking_started_at = Some(get_current_epoch_millis());
         voter.locking_positions.replace(index, &locking_position);
@@ -306,6 +313,13 @@ impl MetaVoteContract {
         let voter_id = env::predecessor_account_id().as_str().to_string();
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let mut locking_position = voter.get_position(index);
+
+        // Same guard as unlock_position: an already unlocking position has no voting
+        // power left in the global counter, so it cannot be unlocked (partially) again.
+        require!(
+            locking_position.unlocking_started_at.is_none(),
+            "position should be locked in order to unlock it"
+        );
 
         let locking_period = locking_position.locking_period;
         let amount = MpDAOAmount::from(amount);
