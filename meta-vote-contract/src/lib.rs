@@ -21,6 +21,8 @@ mod constants;
 mod deposit;
 mod evm_delegate;
 mod internal;
+#[cfg(test)]
+mod tests_unlock;
 mod locking_position;
 mod migrate;
 mod timestamp_utils;
@@ -1104,6 +1106,20 @@ impl MetaVoteContract {
 
         // save voter
         self.voters.insert(&voter_id, &voter);
+    }
+
+    /// Operator repair tool for `total_voting_power`, which is a hand-maintained counter.
+    /// Step 1 (off-chain): sum the result of `get_locked_voting_power_page` over all pages.
+    /// Step 2: call this with the sum. Needed once after deploying the unlock guard, because
+    /// repeated unlock calls may already have drained the counter on mainnet.
+    pub fn operator_set_total_voting_power(&mut self, new_total_voting_power: U128String) {
+        self.assert_operator();
+        log!(
+            "TOTAL-VOTING-POWER: operator changed it from {} to {}",
+            self.total_voting_power,
+            new_total_voting_power.0
+        );
+        self.total_voting_power = new_total_voting_power.0;
     }
 
     // bot-managed. Users might get delegated-vp, but also delegated-vp can be removed
