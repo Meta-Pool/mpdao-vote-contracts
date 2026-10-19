@@ -21,6 +21,8 @@ mod constants;
 mod deposit;
 mod evm_delegate;
 mod internal;
+#[cfg(test)]
+mod tests_rebalance;
 mod locking_position;
 mod migrate;
 mod timestamp_utils;
@@ -774,12 +776,23 @@ impl MetaVoteContract {
             }
         } else {
             // Decrease votes.
+            // Reducing a delegation must wait 7 days since the last refresh, like unvote.
+            // The timestamp is NOT refreshed here: removing votes must not restart the clock.
+            if contract_address == DELEGATED_CONTRACT_CODE {
+                self.assert_delegation_decrease_allowed(
+                    &voter_id,
+                    &contract_address,
+                    &votable_object_id,
+                );
+            }
             let remove_votes = votes - voting_power;
             voter.available_voting_power += remove_votes;
             votes -= remove_votes;
 
-            // Update timestamp for modified vote
-            self.store_vote_timestamp(&voter_id, &contract_address, &votable_object_id);
+            // Update timestamp for modified vote (not for delegations, see above)
+            if contract_address != DELEGATED_CONTRACT_CODE {
+                self.store_vote_timestamp(&voter_id, &contract_address, &votable_object_id);
+            }
 
             log!(
                 "VOTE: {} decreased to {} votes for object {} at address {}.",
@@ -861,6 +874,26 @@ impl MetaVoteContract {
         self.internal_unvote(&voter_id, &contract_address, &votable_object_id, false)
     }
 
+    /// Delegated votes can only be reduced or removed 7 days after the last refresh.
+    /// Used by both unvote and the decrease branch of rebalance, so neither can be used to
+    /// undelegate early (and then delegate the same voting power again).
+    fn assert_delegation_decrease_allowed(
+        &self,
+        voter_id: &String,
+        contract_address: &ContractAddress,
+        votable_object_id: &VotableObjId,
+    ) {
+        let vote_timestamp = self.get_vote_timestamp(voter_id, contract_address, votable_object_id);
+        let time_since_last_refresh = env::block_timestamp_ms().saturating_sub(vote_timestamp);
+        require!(
+            time_since_last_refresh >= crate::timestamp_utils::SEVEN_DAYS_MS,
+            format!(
+                "Cannot unvote delegated votes until 7 days have passed since last refresh. Time remaining: {} ms",
+                crate::timestamp_utils::SEVEN_DAYS_MS.saturating_sub(time_since_last_refresh)
+            )
+        );
+    }
+
     fn internal_unvote(
         &mut self,
         voter_id: &String,
@@ -871,16 +904,7 @@ impl MetaVoteContract {
         // verify if unvoting delegated vote: must wait at least 7 days since last refresh
         // (unless bypassing the restriction, e.g., for operator cleanup of stale votes)
         if contract_address == DELEGATED_CONTRACT_CODE && !bypass_delegation_restriction {
-            let vote_timestamp =
-                self.get_vote_timestamp(voter_id, contract_address, votable_object_id);
-            let time_since_last_refresh = env::block_timestamp_ms().saturating_sub(vote_timestamp);
-            require!(
-                time_since_last_refresh >= crate::timestamp_utils::SEVEN_DAYS_MS,
-                format!(
-                    "Cannot unvote delegated votes until 7 days have passed since last refresh. Time remaining: {} ms",
-                    crate::timestamp_utils::SEVEN_DAYS_MS.saturating_sub(time_since_last_refresh)
-                )
-            );
+            self.assert_delegation_decrease_allowed(voter_id, contract_address, votable_object_id);
         }
 
         // verify if the votes are locked (for example last 48hs of grants voting up to 20 days after)
