@@ -21,6 +21,8 @@ mod constants;
 mod deposit;
 mod evm_delegate;
 mod internal;
+#[cfg(test)]
+mod tests_refresh;
 mod locking_position;
 mod migrate;
 mod timestamp_utils;
@@ -931,9 +933,16 @@ impl MetaVoteContract {
 
     /// Refresh validator votes for a user
     /// Returns how many votes were updated.
+    /// Only the voter itself or the operator can refresh: refreshing restarts the 7-day
+    /// undelegation clock, so letting anyone do it to anyone locks the victim's delegation.
     // refreshing costs 0.01 NEAR, call it with 0.01 NEAR attached
     #[payable]
     pub fn refresh_vote_timestamps(&mut self, voter_id: &AccountId) -> u16 {
+        require!(
+            env::predecessor_account_id() == *voter_id
+                || env::predecessor_account_id() == self.operator_id,
+            "Only the voter or the operator can refresh vote timestamps."
+        );
         // refreshing costs 0.01 NEAR
         require!(
             env::attached_deposit() == ONE_NEAR / 100,
