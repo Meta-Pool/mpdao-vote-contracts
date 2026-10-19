@@ -52,6 +52,11 @@ pub struct OldState {
     // token info & mpdao_prices - added 2025-10-5
     pub token_info: UnorderedMap<AccountId, TokenInfo>,
     pub mpdao_prices: UnorderedMap<AccountId, MpdaoPrice>,
+
+    // MPDAO as unlocked rewards - added 2025-11-21
+    pub claimable_unlocked_mpdao: UnorderedMap<String, u128>,
+    pub accumulated_unlocked_mpdao_distributed_for_claims: u128,
+    pub total_unclaimed_unlocked_mpdao: u128,
 }
 
 #[near_bindgen]
@@ -109,11 +114,14 @@ impl MetaVoteContract {
             token_info: old.token_info,
             mpdao_prices: old.mpdao_prices,
 
-            // new in this version (2025-11-27)
-            // MPDAO as unlocked rewards (new storage)
-            claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlockedMpdao),
-            accumulated_unlocked_mpdao_distributed_for_claims: 0,
-            total_unclaimed_unlocked_mpdao: 0,
+            // MPDAO as unlocked rewards
+            claimable_unlocked_mpdao: old.claimable_unlocked_mpdao,
+            accumulated_unlocked_mpdao_distributed_for_claims: old
+                .accumulated_unlocked_mpdao_distributed_for_claims,
+            total_unclaimed_unlocked_mpdao: old.total_unclaimed_unlocked_mpdao,
+
+            // new in this version: contract allowed to lock voting power used in MPIP votes
+            mpip_contract_id: None,
         }
     }
 }

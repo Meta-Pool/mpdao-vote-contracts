@@ -21,6 +21,8 @@ mod utils;
 mod vote;
 mod vote_counting;
 mod voter;
+#[cfg(test)]
+mod tests_lock_call;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -391,10 +393,15 @@ impl MpipContract {
     ) {
         self.assert_proposal_is_on_voting(&mpip_id);
         self.assert_has_not_voted(mpip_id, env::predecessor_account_id());
+        // the voter's voting power stays locked in meta-vote until the voting period ends
+        let vote_end = self
+            .internal_get_proposal(&mpip_id)
+            .vote_end_timestamp
+            .expect("voting period has not started");
         ext_metavote::ext(self.meta_vote_contract_address.clone())
             .with_static_gas(GAS_FOR_GET_VOTING_POWER)
             .with_attached_deposit(1)
-            .get_mpip_voting_power(env::predecessor_account_id())
+            .lock_and_get_mpip_voting_power(env::predecessor_account_id(), U64(vote_end))
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE_VOTE)

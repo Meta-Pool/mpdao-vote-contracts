@@ -1,6 +1,6 @@
 use crate::types::{MpipId, VoterId};
 use crate::*;
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{U128, U64};
 use near_sdk::{ext_contract, AccountId};
 
 #[allow(dead_code)]
@@ -11,6 +11,8 @@ pub trait ExtMetaVote {
     //fn get_all_locking_positions(&self, voter_id: VoterId);
     fn get_total_voting_power(&self);
     fn get_mpip_voting_power(&self, voter_id: VoterId);
+    // same as get_mpip_voting_power, and locks the voter's voting power until lock_until_ms
+    fn lock_and_get_mpip_voting_power(&mut self, voter_id: VoterId, lock_until_ms: U64);
 }
 
 #[allow(dead_code)]

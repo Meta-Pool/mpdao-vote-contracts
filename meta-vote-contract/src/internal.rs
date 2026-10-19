@@ -67,6 +67,9 @@ impl MetaVoteContract {
         delegate_id: &String,
         voting_power: u128,
     ) {
+        // The delegate may have voted in an MPIP with this voting power: it cannot be taken
+        // away (and handed back to the delegator to vote again) until that vote ends
+        self.assert_not_mpip_locked(delegate_id);
         let delegate = self.voters.get(&delegate_id);
         if let Some(mut delegate) = delegate {
             log!(

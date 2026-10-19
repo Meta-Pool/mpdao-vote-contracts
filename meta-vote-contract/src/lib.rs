@@ -21,8 +21,11 @@ mod constants;
 mod deposit;
 mod evm_delegate;
 mod internal;
+#[cfg(test)]
+mod tests_mpip_lock;
 mod locking_position;
 mod migrate;
+mod mpip_lock;
 mod timestamp_utils;
 mod types;
 mod utils;
@@ -88,6 +91,9 @@ pub struct MetaVoteContract {
     pub claimable_unlocked_mpdao: UnorderedMap<String, u128>,
     pub accumulated_unlocked_mpdao_distributed_for_claims: u128,
     pub total_unclaimed_unlocked_mpdao: u128,
+
+    // the only contract allowed to lock voting power used in MPIP votes
+    pub mpip_contract_id: Option<AccountId>,
 }
 
 #[near_bindgen]
@@ -150,6 +156,7 @@ impl MetaVoteContract {
             claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlockedMpdao),
             accumulated_unlocked_mpdao_distributed_for_claims: 0,
             total_unclaimed_unlocked_mpdao: 0,
+            mpip_contract_id: None,
         }
     }
 
@@ -279,6 +286,7 @@ impl MetaVoteContract {
 
     pub fn unlock_position(&mut self, index: PositionIndex) {
         let voter_id: String = env::predecessor_account_id().as_str().to_string();
+        self.assert_not_mpip_locked(&voter_id);
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let mut locking_position = voter.get_position(index);
 
@@ -304,6 +312,7 @@ impl MetaVoteContract {
 
     pub fn unlock_partial_position(&mut self, index: PositionIndex, amount: U128String) {
         let voter_id = env::predecessor_account_id().as_str().to_string();
+        self.assert_not_mpip_locked(&voter_id);
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let mut locking_position = voter.get_position(index);
 
@@ -608,6 +617,9 @@ impl MetaVoteContract {
         if contract_address != DELEGATED_CONTRACT_CODE {
             return;
         }
+
+        // Voting power used in an MPIP vote cannot be delegated until that vote ends
+        self.assert_not_mpip_locked(voter_id);
 
         // Check 1: If someone has delegated TO caller, caller cannot delegate further
         // (This prevents chains like A→B→C)
