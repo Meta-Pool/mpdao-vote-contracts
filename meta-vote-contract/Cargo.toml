@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["metapool.app <hello@metapool.app>"]
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 near-sdk = "4.0.0"

@@ -38,11 +38,12 @@ pub struct MpdaoPrice {
     pub paused: bool, // if true, buying with this token is paused -- used when price is too volatile
 }
 impl MpdaoPrice {
+    pub fn is_fresh(&self) -> bool {
+        env::block_timestamp_ms() < self.updated_at_ms + 20 * MINUTES_IN_MS
+    }
+
     pub fn assert_valid_price(&self) {
-        require!(
-            env::block_timestamp_ms() < self.updated_at_ms + 20 * MINUTES_IN_MS,
-            "price is stale"
-        );
+        require!(self.is_fresh(), "price is stale");
         require!(!self.paused, "buying with this token is paused");
     }
 }
@@ -180,6 +181,12 @@ impl MetaVoteContract {
                     paused: price.paused,
                 },
             );
+            // Buys keep this raw price. Sells keep a 7-day median that can fall
+            // immediately and can rise at most 10% from the previous accepted day.
+            // The operator should price mpDAO from the mpDAO/stNEAR pool.
+            if crate::sell_position::is_usdt_token(&price.token_contract) {
+                self.record_usdt_sell_observation(price.mpdao_per_token_e9.0);
+            }
         }
     }
 
@@ -222,6 +229,13 @@ impl MetaVoteContract {
             token_and_amount.token != near_as_account_id(),
             "impossible: invalid ft: near"
         );
+
+        // `ft_transfer_call` with msg "fund-reserve" adds USDT to the sell reserve
+        // and does not buy mpDAO. A plain ft_transfer does not reach this function.
+        if msg == crate::constants::FUND_USDT_RESERVE_MSG {
+            self.credit_usdt_reserve(&sender_id, &token_and_amount.token, token_and_amount.amount);
+            return;
+        }
 
         let options: ReceiveTokenOptions = near_sdk::serde_json::from_str(&msg)
             .unwrap_or_else(|_| env::panic_str("Invalid msg format. Must be JSON."));

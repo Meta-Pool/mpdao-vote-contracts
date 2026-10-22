@@ -35,6 +35,7 @@ mod tests_unlock;
 mod tests_withdraw;
 mod locking_position;
 mod migrate;
+mod sell_position;
 mod timestamp_utils;
 mod types;
 mod utils;
@@ -100,6 +101,9 @@ pub struct MetaVoteContract {
     pub claimable_unlocked_mpdao: UnorderedMap<String, u128>,
     pub accumulated_unlocked_mpdao_distributed_for_claims: u128,
     pub total_unclaimed_unlocked_mpdao: u128,
+
+    // sell-position price history and daily USDT payout accounting
+    pub sell_price_guard: sell_position::SellPriceGuard,
 }
 
 #[near_bindgen]
@@ -162,6 +166,7 @@ impl MetaVoteContract {
             claimable_unlocked_mpdao: UnorderedMap::new(StorageKey::ClaimableUnlockedMpdao),
             accumulated_unlocked_mpdao_distributed_for_claims: 0,
             total_unclaimed_unlocked_mpdao: 0,
+            sell_price_guard: sell_position::SellPriceGuard::default(),
         }
     }
 
