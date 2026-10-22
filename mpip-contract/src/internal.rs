@@ -6,15 +6,15 @@ use near_sdk::{env, require, PromiseResult};
 impl MpipContract {
     pub(crate) fn assert_only_admin(&self) {
         require!(
-            self.admin_id == env::signer_account_id(),
+            self.admin_id == env::predecessor_account_id(),
             "Only the admin can call this function."
         );
     }
 
     pub(crate) fn assert_only_operator(&self) {
         require!(
-            self.admin_id == env::signer_account_id()
-                || self.operator_id == env::signer_account_id(),
+            self.admin_id == env::predecessor_account_id()
+                || self.operator_id == env::predecessor_account_id(),
             "Only the operator or admin can call this function."
         );
     }
@@ -22,8 +22,8 @@ impl MpipContract {
     pub(crate) fn assert_only_operator_or_creator(&self, mpip_id: MpipId) {
         let proposal = self.internal_get_proposal(&mpip_id);
         require!(
-            self.operator_id == env::signer_account_id()
-                || proposal.creator_id == env::signer_account_id(),
+            self.operator_id == env::predecessor_account_id()
+                || proposal.creator_id == env::predecessor_account_id(),
             "Only the admin or proposal creator can call this function."
         );
     }
@@ -31,7 +31,7 @@ impl MpipContract {
     pub(crate) fn assert_only_creator(&self, mpip_id: MpipId) {
         let proposal = self.internal_get_proposal(&mpip_id);
         require!(
-            proposal.creator_id == env::signer_account_id(),
+            proposal.creator_id == env::predecessor_account_id(),
             "Only the proposal creator can call this function."
         );
     }

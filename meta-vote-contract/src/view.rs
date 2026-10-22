@@ -114,6 +114,24 @@ impl MetaVoteContract {
         results
     }
 
+    /// Sum of the voting power of all LOCKED positions for a page of voters.
+    /// Add up all pages to get the value `total_voting_power` should have, then pass it to
+    /// `operator_set_total_voting_power`.
+    pub fn get_locked_voting_power_page(&self, from_index: u32, limit: u32) -> U128String {
+        let keys = self.voters.keys_as_vector();
+        let voters_len = keys.len() as u64;
+        let start = from_index as u64;
+        let limit = limit as u64;
+
+        let mut total = 0_u128;
+        for index in start..std::cmp::min(start + limit, voters_len) {
+            let voter_id = keys.get(index).unwrap();
+            let voter = self.voters.get(&voter_id).unwrap();
+            total += voter.sum_locked_vp();
+        }
+        total.into()
+    }
+
     pub fn get_balance(&self, voter_id: VoterId) -> U128String {
         let voter = self.internal_get_voter(&voter_id);
         let balance = voter.balance + voter.sum_unlocked();

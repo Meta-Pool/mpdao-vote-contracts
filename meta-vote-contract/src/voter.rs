@@ -37,8 +37,15 @@ impl Voter {
         }
     }
 
+    /// A voter record can only be dropped when nothing in the contract still refers to it.
+    /// Votes (own or delegated) and available voting power live in this record, so a voter
+    /// with live votes or received delegated vp must be kept, otherwise its votes stay in the
+    /// global tally with no record left that could ever remove them ("ghost votes").
     pub(crate) fn is_empty(&self) -> bool {
-        self.balance == 0 && self.locking_positions.is_empty()
+        self.balance == 0
+            && self.locking_positions.is_empty()
+            && self.vote_positions.is_empty()
+            && self.available_voting_power == 0
     }
 
     pub(crate) fn sum_locked(&self) -> MpDAOAmount {

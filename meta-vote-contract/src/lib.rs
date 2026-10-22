@@ -21,6 +21,18 @@ mod constants;
 mod deposit;
 mod evm_delegate;
 mod internal;
+#[cfg(test)]
+mod tests_buy_and_lock;
+#[cfg(test)]
+mod tests_extend;
+#[cfg(test)]
+mod tests_rebalance;
+#[cfg(test)]
+mod tests_refresh;
+#[cfg(test)]
+mod tests_unlock;
+#[cfg(test)]
+mod tests_withdraw;
 mod locking_position;
 mod migrate;
 mod timestamp_utils;
@@ -282,6 +294,13 @@ impl MetaVoteContract {
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let mut locking_position = voter.get_position(index);
 
+        // A position can only be unlocked once. Without this guard every repeated call
+        // subtracts the same voting power from the global counter again.
+        require!(
+            locking_position.unlocking_started_at.is_none(),
+            "position should be locked in order to unlock it"
+        );
+
         let voting_power_to_remove = locking_position.voting_power;
         locking_position.unlocking_started_at = Some(get_current_epoch_millis());
         voter.locking_positions.replace(index, &locking_position);
@@ -306,6 +325,13 @@ impl MetaVoteContract {
         let voter_id = env::predecessor_account_id().as_str().to_string();
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let mut locking_position = voter.get_position(index);
+
+        // Same guard as unlock_position: an already unlocking position has no voting
+        // power left in the global counter, so it cannot be unlocked (partially) again.
+        require!(
+            locking_position.unlocking_started_at.is_none(),
+            "position should be locked in order to unlock it"
+        );
 
         let locking_period = locking_position.locking_period;
         let amount = MpDAOAmount::from(amount);
@@ -362,6 +388,15 @@ impl MetaVoteContract {
         require!(
             new_locking_period > locking_position.locking_period,
             "new auto-lock period should be greater than previous one"
+        );
+        // Same limit the deposit path enforces (locking_position.rs): without it one call
+        // could lift a position up to the generic <3600 days assert in calculate_voting_power.
+        require!(
+            new_locking_period <= self.max_unbond_period,
+            format!(
+                "Unbound period must be between {} and {} days",
+                self.min_unbond_period, self.max_unbond_period
+            )
         );
 
         log!(
@@ -774,12 +809,23 @@ impl MetaVoteContract {
             }
         } else {
             // Decrease votes.
+            // Reducing a delegation must wait 7 days since the last refresh, like unvote.
+            // The timestamp is NOT refreshed here: removing votes must not restart the clock.
+            if contract_address == DELEGATED_CONTRACT_CODE {
+                self.assert_delegation_decrease_allowed(
+                    &voter_id,
+                    &contract_address,
+                    &votable_object_id,
+                );
+            }
             let remove_votes = votes - voting_power;
             voter.available_voting_power += remove_votes;
             votes -= remove_votes;
 
-            // Update timestamp for modified vote
-            self.store_vote_timestamp(&voter_id, &contract_address, &votable_object_id);
+            // Update timestamp for modified vote (not for delegations, see above)
+            if contract_address != DELEGATED_CONTRACT_CODE {
+                self.store_vote_timestamp(&voter_id, &contract_address, &votable_object_id);
+            }
 
             log!(
                 "VOTE: {} decreased to {} votes for object {} at address {}.",
@@ -861,6 +907,26 @@ impl MetaVoteContract {
         self.internal_unvote(&voter_id, &contract_address, &votable_object_id, false)
     }
 
+    /// Delegated votes can only be reduced or removed 7 days after the last refresh.
+    /// Used by both unvote and the decrease branch of rebalance, so neither can be used to
+    /// undelegate early (and then delegate the same voting power again).
+    fn assert_delegation_decrease_allowed(
+        &self,
+        voter_id: &String,
+        contract_address: &ContractAddress,
+        votable_object_id: &VotableObjId,
+    ) {
+        let vote_timestamp = self.get_vote_timestamp(voter_id, contract_address, votable_object_id);
+        let time_since_last_refresh = env::block_timestamp_ms().saturating_sub(vote_timestamp);
+        require!(
+            time_since_last_refresh >= crate::timestamp_utils::SEVEN_DAYS_MS,
+            format!(
+                "Cannot unvote delegated votes until 7 days have passed since last refresh. Time remaining: {} ms",
+                crate::timestamp_utils::SEVEN_DAYS_MS.saturating_sub(time_since_last_refresh)
+            )
+        );
+    }
+
     fn internal_unvote(
         &mut self,
         voter_id: &String,
@@ -871,16 +937,7 @@ impl MetaVoteContract {
         // verify if unvoting delegated vote: must wait at least 7 days since last refresh
         // (unless bypassing the restriction, e.g., for operator cleanup of stale votes)
         if contract_address == DELEGATED_CONTRACT_CODE && !bypass_delegation_restriction {
-            let vote_timestamp =
-                self.get_vote_timestamp(voter_id, contract_address, votable_object_id);
-            let time_since_last_refresh = env::block_timestamp_ms().saturating_sub(vote_timestamp);
-            require!(
-                time_since_last_refresh >= crate::timestamp_utils::SEVEN_DAYS_MS,
-                format!(
-                    "Cannot unvote delegated votes until 7 days have passed since last refresh. Time remaining: {} ms",
-                    crate::timestamp_utils::SEVEN_DAYS_MS.saturating_sub(time_since_last_refresh)
-                )
-            );
+            self.assert_delegation_decrease_allowed(voter_id, contract_address, votable_object_id);
         }
 
         // verify if the votes are locked (for example last 48hs of grants voting up to 20 days after)
@@ -931,9 +988,16 @@ impl MetaVoteContract {
 
     /// Refresh validator votes for a user
     /// Returns how many votes were updated.
+    /// Only the voter itself or the operator can refresh: refreshing restarts the 7-day
+    /// undelegation clock, so letting anyone do it to anyone locks the victim's delegation.
     // refreshing costs 0.01 NEAR, call it with 0.01 NEAR attached
     #[payable]
     pub fn refresh_vote_timestamps(&mut self, voter_id: &AccountId) -> u16 {
+        require!(
+            env::predecessor_account_id() == *voter_id
+                || env::predecessor_account_id() == self.operator_id,
+            "Only the voter or the operator can refresh vote timestamps."
+        );
         // refreshing costs 0.01 NEAR
         require!(
             env::attached_deposit() == ONE_NEAR / 100,
@@ -1090,6 +1154,20 @@ impl MetaVoteContract {
 
         // save voter
         self.voters.insert(&voter_id, &voter);
+    }
+
+    /// Operator repair tool for `total_voting_power`, which is a hand-maintained counter.
+    /// Step 1 (off-chain): sum the result of `get_locked_voting_power_page` over all pages.
+    /// Step 2: call this with the sum. Needed once after deploying the unlock guard, because
+    /// repeated unlock calls may already have drained the counter on mainnet.
+    pub fn operator_set_total_voting_power(&mut self, new_total_voting_power: U128String) {
+        self.assert_operator();
+        log!(
+            "TOTAL-VOTING-POWER: operator changed it from {} to {}",
+            self.total_voting_power,
+            new_total_voting_power.0
+        );
+        self.total_voting_power = new_total_voting_power.0;
     }
 
     // bot-managed. Users might get delegated-vp, but also delegated-vp can be removed

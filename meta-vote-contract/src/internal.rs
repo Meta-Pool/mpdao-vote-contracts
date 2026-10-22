@@ -76,6 +76,15 @@ impl MetaVoteContract {
             );
             self.adjust_voter_voting_power(delegate_id, &mut delegate);
             self.voters.insert(&delegate_id, &delegate);
+        } else {
+            // Should not happen once Voter::is_empty() keeps voters that hold votes or
+            // delegated vp. It can still happen for records dropped before that fix, and
+            // panicking here would block delegators from undelegating, so log loudly.
+            log!(
+                "INCONSISTENCY: delegate {} has no voter record; {} delegated VP removed without clawback",
+                delegate_id,
+                voting_power
+            );
         }
     }
 

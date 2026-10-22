@@ -1,8 +1,8 @@
 use crate::*;
 use near_contract_standards::fungible_token::core::ext_ft_core;
-use near_sdk::json_types::U64;
+use near_sdk::json_types::{U128, U64};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{assert_one_yocto, near_bindgen, Promise};
+use near_sdk::{assert_one_yocto, near_bindgen, Promise, PromiseResult};
 
 /// for a given token: store amount received and enable/disable in contract's state
 #[near_bindgen]
@@ -342,14 +342,29 @@ impl MetaVoteContract {
         }
     }
 
+    /// `amount` is the exact amount sent by transfer_received_tokens. The counter is only
+    /// reduced when the transfer succeeded, and only by that amount, so tokens that were
+    /// credited by a new buy while the transfer was in flight are not lost either.
     #[private]
-    pub fn resolve_transfer_received_tokens(&mut self, token_address: &AccountId) {
-        let mut token_info = self
-            .token_info
-            .get(&token_address)
-            .expect("Token not found");
-        token_info.amount_received = 0;
-        self.token_info.insert(&token_address, &token_info);
+    pub fn resolve_transfer_received_tokens(&mut self, token_address: &AccountId, amount: U128) {
+        match env::promise_result(0) {
+            PromiseResult::Successful(_) => {
+                let mut token_info = self
+                    .token_info
+                    .get(&token_address)
+                    .expect("Token not found");
+                token_info.amount_received = token_info.amount_received.saturating_sub(amount.0);
+                self.token_info.insert(&token_address, &token_info);
+            }
+            _ => {
+                // the ft_transfer failed: keep amount_received so the tokens can be sent again
+                log!(
+                    "FAILED: transfer of {} {} to the owner failed, amount_received kept",
+                    amount.0,
+                    token_address
+                );
+            }
+        }
     }
 
     // transfer any received tokens (stNEAR, USDT, USDC) to owner
@@ -374,7 +389,10 @@ impl MetaVoteContract {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
-                    .resolve_transfer_received_tokens(token_address),
+                    .resolve_transfer_received_tokens(
+                        token_address,
+                        token_info.amount_received.into(),
+                    ),
             )
     }
 }

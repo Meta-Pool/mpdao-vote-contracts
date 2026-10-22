@@ -26,6 +26,7 @@ pub trait SelfMetaVote {
 
     fn create_proposal_callback(
         &mut self,
+        creator_id: AccountId,
         title: String,
         short_description: String,
         body: String,
