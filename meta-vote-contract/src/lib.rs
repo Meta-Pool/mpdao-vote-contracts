@@ -596,27 +596,16 @@ impl MetaVoteContract {
     // * Voting *
     // **********
 
-    /// Vote or delegate voting power to a contract/proposal or to another voter.
+    /// Vote voting power to a contract or proposal.
     ///
-    /// # Delegation Rules
-    ///
-    /// To prevent recursive delegation chains, the following rules are enforced:
-    /// - If someone has delegated TO you, you CANNOT delegate further (prevents A→B→C chains)
-    /// - You CANNOT delegate to someone who has already delegated to others (prevents A→B→C from target side)
-    /// - You CANNOT delegate to yourself
-    ///
-    /// # What IS Allowed
-    ///
-    /// - ✅ Multiple delegations from the same user (A→B and A→C)
-    /// - ✅ More than one delegator to the same delegate (A→B and C→B)
-    /// - ✅ Voting and delegating (A votes + A→B)
-    /// - ✅ Delegating again after previous delegation (A→B, then later A→C)
+    /// New vote-delegation (`contract_address == "delegated"`) is rejected. An existing
+    /// delegation can still be reduced with `rebalance` or removed with `unvote`.
     ///
     /// # Arguments
     ///
     /// * `voting_power` - Amount of voting power to allocate
-    /// * `contract_address` - Target contract address (use "delegated" for delegation)
-    /// * `votable_object_id` - Object/proposal ID to vote for (or delegate account ID)
+    /// * `contract_address` - Target contract address
+    /// * `votable_object_id` - Object or proposal ID to vote for
     pub fn vote(
         &mut self,
         voting_power: U128String,
@@ -627,45 +616,13 @@ impl MetaVoteContract {
         self.internal_vote(&voter_id, voting_power, contract_address, votable_object_id)
     }
 
-    /// Validates delegation rules to prevent recursive delegation chains.
-    ///
-    /// This function enforces three critical checks:
-    /// 1. If someone has delegated TO the voter, they cannot delegate further (prevents A→B→C)
-    /// 2. Cannot delegate to yourself
-    /// 3. Cannot delegate to someone who has already delegated to others (prevents A→B→C from target side)
-    fn validate_delegation_rules(
-        &self,
-        voter_id: &String,
-        contract_address: &ContractAddress,
-        votable_object_id: &VotableObjId,
-    ) {
-        // Only validate if this is a delegation operation
-        if contract_address != DELEGATED_CONTRACT_CODE {
-            return;
-        }
-
-        // Check 1: If someone has delegated TO caller, caller cannot delegate further
-        // (This prevents chains like A→B→C)
-        if self.internal_get_delegated_vp(voter_id) > 0 {
-            panic!("Cannot delegate if you have received delegated votes.");
-        }
-
-        // Check 2: Prevent self-delegation
-        if votable_object_id == voter_id {
-            panic!("Cannot delegate to yourself.");
-        }
-
-        let delegatee_voter = self.internal_get_voter(votable_object_id);
-
-        // Check 3: Target has delegated TO someone else
-        // (This prevents chains like A→B→C from the target side)
-        if delegatee_voter
-            .vote_positions
-            .get(&DELEGATED_CONTRACT_CODE.to_string())
-            .is_some()
-        {
-            panic!("Cannot delegate votes to someone who is also a delegator.");
-        }
+    /// New vote-delegation is rejected. Existing delegations stay in storage and can still
+    /// be reduced or removed; this does not change the contract state layout.
+    fn reject_new_vote_delegation(contract_address: &ContractAddress) {
+        require!(
+            contract_address != DELEGATED_CONTRACT_CODE,
+            "Vote delegation is deprecated. Existing delegations can still be reduced or removed."
+        );
     }
 
     fn internal_vote(
@@ -675,8 +632,7 @@ impl MetaVoteContract {
         contract_address: ContractAddress,
         votable_object_id: VotableObjId,
     ) {
-        // Validate delegation rules if this is a delegation operation
-        self.validate_delegation_rules(voter_id, &contract_address, &votable_object_id);
+        Self::reject_new_vote_delegation(&contract_address);
 
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let voting_power = u128::from(voting_power);
@@ -774,8 +730,7 @@ impl MetaVoteContract {
             // Increase votes.
             let additional_votes = voting_power - votes;
 
-            // Validate delegation rules when increasing delegation votes
-            self.validate_delegation_rules(&voter_id, &contract_address, &votable_object_id);
+            Self::reject_new_vote_delegation(&contract_address);
 
             assert!(
                 voter.available_voting_power >= additional_votes,
@@ -905,6 +860,30 @@ impl MetaVoteContract {
             contract_address.as_str()
         );
         self.internal_unvote(&voter_id, &contract_address, &votable_object_id, false)
+    }
+
+    /// Owner or operator. Removes an existing vote-delegation immediately, skipping the 7-day wait.
+    /// The delegate's voting power is clawed back the same way as `unvote`.
+    /// `delegations` is a list of (delegator_id, delegate_id). Returns how many were removed.
+    pub fn operator_force_undelegate(&mut self, delegations: Vec<(String, String)>) -> u32 {
+        let caller = env::predecessor_account_id();
+        require!(
+            caller == self.owner_id || caller == self.operator_id,
+            "Only the owner or the operator can call this function."
+        );
+        let contract_address = DELEGATED_CONTRACT_CODE.to_string();
+        let mut count = 0_u32;
+        for (delegator_id, delegate_id) in delegations {
+            log!(
+                "FORCE-UNDELEGATE: {} removed {}'s delegation to {}",
+                caller,
+                delegator_id,
+                delegate_id
+            );
+            self.internal_unvote(&delegator_id, &contract_address, &delegate_id, true);
+            count += 1;
+        }
+        count
     }
 
     /// Delegated votes can only be reduced or removed 7 days after the last refresh.

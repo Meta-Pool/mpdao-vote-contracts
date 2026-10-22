@@ -54,15 +54,36 @@ fn delegated() -> String {
     crate::internal::DELEGATED_CONTRACT_CODE.to_string()
 }
 
-/// alice delegates `amount` vp to bob at T0, returns the amount
+/// alice already has `amount` vp delegated to bob. Built through the internal writer because
+/// the public vote path no longer accepts new delegations.
 fn setup_delegation() -> (MetaVoteContract, u128) {
     let mut contract = new_contract();
     add_voter(&mut contract, "alice.near");
     add_voter(&mut contract, "bob.near");
-    testing_env!(context("alice.near").build());
+    let voter_id = "alice.near".to_string();
+    let mut alice = contract.internal_get_voter(&voter_id);
     let amount = 40 * 10u128.pow(24);
-    contract.vote(U128(amount), delegated(), "bob.near".to_string());
+    let delegate = "bob.near".to_string();
+    let contract_address = delegated();
+    contract.internal_create_voting_position(
+        &voter_id,
+        &mut alice,
+        amount,
+        &contract_address,
+        &delegate,
+    );
+    contract.voters.insert(&voter_id, &alice);
     (contract, amount)
+}
+
+#[test]
+#[should_panic(expected = "Vote delegation is deprecated")]
+fn new_vote_delegation_is_rejected() {
+    let mut contract = new_contract();
+    add_voter(&mut contract, "alice.near");
+    add_voter(&mut contract, "bob.near");
+    testing_env!(context("alice.near").build());
+    contract.vote(U128(10u128.pow(24)), delegated(), "bob.near".to_string());
 }
 
 #[test]
@@ -85,10 +106,37 @@ fn rebalance_down_after_7_days_works_and_does_not_restart_the_clock() {
 }
 
 #[test]
-fn rebalance_up_still_works_inside_7_days() {
+#[should_panic(expected = "Vote delegation is deprecated")]
+fn rebalance_up_is_rejected() {
     let (mut contract, amount) = setup_delegation();
     testing_env!(context_at("alice.near", T0 + DAY_NS).build());
     contract.rebalance(U128(amount + 10u128.pow(24)), delegated(), "bob.near".to_string());
+}
+
+#[test]
+fn operator_can_force_undelegate_before_7_days() {
+    let (mut contract, _) = setup_delegation();
+    testing_env!(context_at("operator.near", T0 + DAY_NS).build());
+    let removed = contract.operator_force_undelegate(vec![(
+        "alice.near".to_string(),
+        "bob.near".to_string(),
+    )]);
+    assert_eq!(removed, 1);
     let alice = contract.internal_get_voter(&"alice.near".to_string());
-    assert_eq!(alice.sum_delegated_away_vp(), amount + 10u128.pow(24));
+    assert_eq!(alice.sum_delegated_away_vp(), 0);
+    assert_eq!(
+        contract.internal_get_delegated_vp(&"bob.near".to_string()),
+        0
+    );
+}
+
+#[test]
+#[should_panic(expected = "Only the owner or the operator can call this function.")]
+fn delegator_cannot_force_undelegate() {
+    let (mut contract, _) = setup_delegation();
+    testing_env!(context_at("alice.near", T0 + DAY_NS).build());
+    contract.operator_force_undelegate(vec![(
+        "alice.near".to_string(),
+        "bob.near".to_string(),
+    )]);
 }
