@@ -55,4 +55,5 @@ pub enum StorageKey {
     TokenInfo,
     MpdaoPrices,
     ClaimableUnlockedMpdao,
+    RealizedEthMirrors,
 }

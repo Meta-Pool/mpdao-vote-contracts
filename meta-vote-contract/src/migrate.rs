@@ -119,8 +119,8 @@ impl MetaVoteContract {
                 .accumulated_unlocked_mpdao_distributed_for_claims,
             total_unclaimed_unlocked_mpdao: old.total_unclaimed_unlocked_mpdao,
 
-            // new in this version: 7-day sell price and the daily USDT payout counter
             sell_price_guard: sell_position::SellPriceGuard::default(),
+            realized_eth_mirrors: near_sdk::store::LookupMap::new(StorageKey::RealizedEthMirrors),
         }
     }
 }

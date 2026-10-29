@@ -32,9 +32,12 @@ mod tests_refresh;
 #[cfg(test)]
 mod tests_unlock;
 #[cfg(test)]
+mod tests_realize;
+#[cfg(test)]
 mod tests_withdraw;
 mod locking_position;
 mod migrate;
+mod realize_mirror;
 mod sell_position;
 mod timestamp_utils;
 mod types;
@@ -104,6 +107,10 @@ pub struct MetaVoteContract {
 
     // sell-position price history and daily USDT payout accounting
     pub sell_price_guard: sell_position::SellPriceGuard,
+
+    /// Ethereum addresses whose mirror was already converted onto a NEAR delegate.
+    /// Appended at the end. Populated by `migrate` and `new`.
+    pub realized_eth_mirrors: LookupMap<EvmAddress, bool>,
 }
 
 #[near_bindgen]
@@ -167,6 +174,7 @@ impl MetaVoteContract {
             accumulated_unlocked_mpdao_distributed_for_claims: 0,
             total_unclaimed_unlocked_mpdao: 0,
             sell_price_guard: sell_position::SellPriceGuard::default(),
+            realized_eth_mirrors: LookupMap::new(StorageKey::RealizedEthMirrors),
         }
     }
 
@@ -1105,6 +1113,10 @@ impl MetaVoteContract {
         locking_positions: Vec<(u16, U128String)>,
     ) {
         self.assert_operator();
+        if self.is_eth_mirror_realized(external_address.clone()) {
+            log!("{} already realized, skip mirror", external_address);
+            return;
+        }
         // external mirrored addresses are in the form of [address].evmp.near
         // example for an eth based address: f1552d1d7CD279A7B766F431c5FaC49A2fb6e361.evmp.near
         // evmp.near is controlled by the dao. No external user can create a xxx.evmp.near account
