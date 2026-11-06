@@ -74,6 +74,33 @@ fn failed_transfer_keeps_amount_received() {
     );
 }
 
+fn run_burn_callback(contract: &mut MetaVoteContract, result: PromiseResult, amount: u128) {
+    testing_env!(
+        context("metavote.near").build(),
+        VMConfig::test(),
+        RuntimeFeesConfig::test(),
+        HashMap::default(),
+        vec![result]
+    );
+    contract.after_burn_sold_mpdao(&acct("alice.near"), U128(amount));
+}
+
+#[test]
+fn successful_burn_leaves_the_sell_inventory_unchanged() {
+    let mut contract = new_contract();
+    contract.mpdao_avail_to_sell = 7;
+    run_burn_callback(&mut contract, PromiseResult::Successful(vec![]), 1_000_000);
+    assert_eq!(contract.mpdao_avail_to_sell, 7);
+}
+
+#[test]
+fn failed_burn_adds_the_sold_mpdao_to_the_sell_inventory() {
+    let mut contract = new_contract();
+    contract.mpdao_avail_to_sell = 7;
+    run_burn_callback(&mut contract, PromiseResult::Failed, 1_000_000);
+    assert_eq!(contract.mpdao_avail_to_sell, 7 + 1_000_000);
+}
+
 #[test]
 fn successful_transfer_subtracts_only_the_amount_sent() {
     // 2_000 were credited by a new buy while the transfer of 5_000 was in flight

@@ -1,8 +1,14 @@
 use crate::*;
 use near_contract_standards::fungible_token::core::ext_ft_core;
-use near_sdk::json_types::U64;
+use near_sdk::json_types::{U128, U64};
 use near_sdk::serde::Serialize;
-use near_sdk::{assert_one_yocto, near_bindgen, AccountId, Promise, PromiseResult};
+use near_sdk::{assert_one_yocto, ext_contract, near_bindgen, AccountId, Promise, PromiseResult};
+
+#[allow(dead_code)]
+#[ext_contract(ext_mpdao_burn)]
+trait ExtMpdaoBurn {
+    fn ft_burn(&mut self, amount: U128, memo: Option<String>);
+}
 
 /// One accepted USDT/mpDAO observation. `mpdao_per_token_e9` is what sells use for that day.
 /// `cap_base_e9` is the previous accepted price, and it does not move when today's price falls,
@@ -425,7 +431,8 @@ impl MetaVoteContract {
 
     /// Sell a whole locked or unlocking position for USDT from the reserve.
     /// A locked position also drops its voting power. An unlocking position already did.
-    /// mpDAO is returned to the sell inventory only after the USDT transfer succeeds.
+    /// After the USDT transfer succeeds, the position's mpDAO is burned.
+    /// A failed burn adds that mpDAO to the sell inventory.
     #[payable]
     pub fn sell_locking_position(&mut self, index: PositionIndex) -> Promise {
         assert_one_yocto();
@@ -542,10 +549,6 @@ impl MetaVoteContract {
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {
-                self.mpdao_avail_to_sell = self
-                    .mpdao_avail_to_sell
-                    .checked_add(mpdao_amount)
-                    .expect("mpdao inventory overflow");
                 log!(
                     "SELL: {} sold {} mpDAO locked {} days for {} {}",
                     seller,
@@ -554,6 +557,17 @@ impl MetaVoteContract {
                     usdt_amount,
                     payout_token
                 );
+                // The seller is already paid. Burn that mpDAO. The callback
+                // returns it to the sell inventory only if the burn fails.
+                let _burn = ext_mpdao_burn::ext(self.mpdao_token_contract_address.clone())
+                    .with_static_gas(GAS_FOR_MPDAO_BURN)
+                    .with_attached_deposit(1)
+                    .ft_burn(U128(mpdao_amount), Some("sell locked position".to_string()))
+                    .then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(GAS_FOR_BURN_SOLD_CALLBACK)
+                            .after_burn_sold_mpdao(seller, U128(mpdao_amount)),
+                    );
             }
             PromiseResult::Failed => {
                 log!(
@@ -595,6 +609,28 @@ impl MetaVoteContract {
                         unlocking_started_at,
                     );
                 }
+            }
+        }
+    }
+
+    /// Burn result for a sold position. A failed burn puts the mpDAO back in the sell inventory.
+    #[private]
+    pub fn after_burn_sold_mpdao(&mut self, seller: &AccountId, mpdao_amount: U128String) {
+        let mpdao_amount = mpdao_amount.0;
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(_) => {
+                log!("SELL: burned {} mpDAO from {} sale", mpdao_amount, seller);
+            }
+            PromiseResult::Failed => {
+                self.mpdao_avail_to_sell = self
+                    .mpdao_avail_to_sell
+                    .checked_add(mpdao_amount)
+                    .expect("mpdao inventory overflow");
+                log!(
+                    "FAILED: burn of {} mpDAO from {} sale failed. Added to sell inventory.",
+                    mpdao_amount, seller
+                );
             }
         }
     }

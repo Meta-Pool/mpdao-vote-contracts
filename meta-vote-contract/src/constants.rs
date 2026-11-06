@@ -16,7 +16,10 @@ pub const MINUTES_IN_MS: u64 = 60 * SECONDS_IN_MS;
 pub const GAS_FOR_FT_TRANSFER: Gas = Gas(47 * TGAS);
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(11 * TGAS);
 /// Restoring a sold position touches voter storage, so the callback needs more than a balance refund.
-pub const GAS_FOR_SELL_CALLBACK: Gas = Gas(30 * TGAS);
+/// The success path also schedules `ft_burn` and `after_burn_sold_mpdao`.
+pub const GAS_FOR_SELL_CALLBACK: Gas = Gas(60 * TGAS);
+pub const GAS_FOR_MPDAO_BURN: Gas = Gas(10 * TGAS);
+pub const GAS_FOR_BURN_SOLD_CALLBACK: Gas = Gas(15 * TGAS);
 
 /// Lock length at which selling a position keeps 10% of the free-mpDAO USDT price.
 pub const SELL_DISCOUNT_ANCHOR_DAYS: u16 = 300;
