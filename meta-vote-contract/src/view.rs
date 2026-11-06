@@ -39,6 +39,12 @@ pub struct ContractInfoJson {
 
 #[near_bindgen]
 impl MetaVoteContract {
+    /// NEP-330 source metadata. Cargo-near stamps the Rust image and commit into
+    /// this during a reproducible build. A plain `cargo build` leaves `build_info` empty.
+    pub fn contract_source_metadata(&self) -> near_sdk::serde_json::Value {
+        crate::source_metadata::contract_source_metadata()
+    }
+
     pub fn get_owner_id(&self) -> String {
         self.owner_id.to_string()
     }

@@ -39,6 +39,7 @@ mod locking_position;
 mod migrate;
 mod realize_mirror;
 mod sell_position;
+mod source_metadata;
 mod timestamp_utils;
 mod types;
 mod utils;

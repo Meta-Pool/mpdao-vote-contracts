@@ -1,3 +1,11 @@
+# Reproducible vote-contract build. Verifiers replay the image pinned in
+# meta-vote-contract/Cargo.toml, which is Rust 1.81.
+if [ "${1:-}" = "reproducible" ]; then
+    cd "$(dirname "$0")/.."
+    cargo near build reproducible-wasm --manifest-path meta-vote-contract/Cargo.toml --out-dir res
+    exit 0
+fi
+
 rustup override set 1.81
 export RUSTFLAGS='-C link-arg=-s'
 echo =========================================================

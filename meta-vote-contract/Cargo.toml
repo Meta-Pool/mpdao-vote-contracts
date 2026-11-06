@@ -3,6 +3,15 @@ name = "meta-vote-contract"
 version = "2.0.0"
 edition = "2021"
 authors = ["metapool.app <hello@metapool.app>"]
+repository = "https://github.com/Meta-Pool/mpdao-vote-contracts"
+
+# NEP-330. Verifiers rebuild with this image. The tag's Rust version is a label;
+# the digest is what they pull. This contract has to stay on Rust 1.81.
+[package.metadata.near.reproducible_build]
+image = "sourcescan/cargo-near:0.8.2-rust-1.81.0"
+image_digest = "sha256:3b5e6efa1d0cef710009f9cc20c845d316187cc170455edc5ba7fdf471c19655"
+passed_env = []
+container_build_command = ["cargo", "near", "build"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
