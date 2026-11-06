@@ -2,7 +2,7 @@
 # meta-vote-contract/Cargo.toml, which is Rust 1.81.
 if [ "${1:-}" = "reproducible" ]; then
     cd "$(dirname "$0")/.."
-    cargo near build reproducible-wasm --manifest-path meta-vote-contract/Cargo.toml --out-dir res
+    env -u CARGO_TARGET_DIR cargo near build reproducible-wasm --manifest-path meta-vote-contract/Cargo.toml --out-dir res
     exit 0
 fi
 
