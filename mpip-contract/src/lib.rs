@@ -221,6 +221,7 @@ impl MpipContract {
         extra: String,
     ) {
         self.assert_open_for_new_mpips();
+        Self::assert_proposal_fields_len(&title, &short_description, &body, &data, &extra);
         self.assert_proposal_storage_is_covered();
         ext_metavote::ext(self.meta_vote_contract_address.clone())
             .with_static_gas(GAS_FOR_GET_VOTING_POWER)
@@ -276,6 +277,7 @@ impl MpipContract {
     ) {
         self.assert_only_creator(mpip_id);
         self.assert_proposal_is_active_or_draft(mpip_id);
+        Self::assert_proposal_fields_len(&title, &short_description, &body, &data, &extra);
         let mut proposal = self.internal_get_proposal(&mpip_id);
         proposal.title = title;
         proposal.short_description = short_description;
@@ -404,6 +406,7 @@ impl MpipContract {
         limit_vp: u128,
         memo: String,
     ) {
+        Self::assert_memo_len(&memo);
         self.assert_proposal_is_on_voting(&mpip_id);
         self.assert_has_not_voted(mpip_id, env::predecessor_account_id());
         ext_metavote::ext(self.meta_vote_contract_address.clone())
