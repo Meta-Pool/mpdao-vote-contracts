@@ -63,7 +63,7 @@ impl LockingPosition {
 
 impl MetaVoteContract {
 
-    fn increase_locking_position(
+    pub(crate) fn increase_locking_position(
         &mut self,
         voter: &mut Voter,
         index: u64,

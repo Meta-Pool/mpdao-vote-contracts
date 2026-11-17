@@ -593,11 +593,11 @@ impl MetaVoteContract {
                 let voter_id = seller.to_string();
                 let mut voter = self.internal_get_voter(&voter_id);
                 if unlocking_started_at == 0 {
-                    self.deposit_locking_position(
-                        mpdao_amount,
-                        locking_days,
+                    self.restore_locked_position(
                         &voter_id,
                         &mut voter,
+                        mpdao_amount,
+                        locking_days,
                     );
                 } else {
                     self.restore_unlocking_position(
@@ -646,17 +646,41 @@ impl MetaVoteContract {
         voting_power: u128,
         unlocking_started_at: u64,
     ) {
-        assert!(
-            (voter.locking_positions.len() as u8) < self.max_locking_positions,
-            "The max number of locking positions is {}",
-            self.max_locking_positions
-        );
+        // No max_locking_positions check here: this is a rollback of a position the
+        // seller already owned. Anyone can fill the seller's slots by gifting locks,
+        // and a panic would leave the mpDAO orphaned (position removed, sale failed).
         voter.locking_positions.push(&LockingPosition::new(
             mpdao_amount,
             locking_days,
             voting_power,
             Some(unlocking_started_at),
         ));
+        self.voters.insert(voter_id, voter);
+    }
+
+    /// Rollback of a failed sale of a locked position. Same as a deposit but it never
+    /// panics on the slot limit or on unbond-period bounds changed in the meantime.
+    fn restore_locked_position(
+        &mut self,
+        voter_id: &String,
+        voter: &mut Voter,
+        mpdao_amount: MpDAOAmount,
+        locking_days: Days,
+    ) {
+        match voter.find_locked_position(locking_days) {
+            Some(index) => self.increase_locking_position(voter, index, mpdao_amount, locking_days),
+            None => {
+                let voting_power = utils::calculate_voting_power(mpdao_amount, locking_days);
+                voter.locking_positions.push(&LockingPosition::new(
+                    mpdao_amount,
+                    locking_days,
+                    voting_power,
+                    None,
+                ));
+                voter.available_voting_power += voting_power;
+                self.total_voting_power += voting_power;
+            }
+        }
         self.voters.insert(voter_id, voter);
     }
 }
