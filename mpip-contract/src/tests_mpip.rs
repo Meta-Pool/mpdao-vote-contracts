@@ -124,3 +124,57 @@ fn vote_callback_counts_a_single_vote() {
     contract.vote_proposal_callback(0, acct("alice.near"), VoteType::For, U128(0), String::new());
     assert_eq!(contract.internal_get_proposal_vote(0).for_votes, 500);
 }
+
+fn run_create_callback(contract: &mut MpipContract, result: PromiseResult) -> Option<MpipId> {
+    testing_env!(
+        builder("mpip.near").build(),
+        VMConfig::test(),
+        RuntimeFeesConfig::test(),
+        HashMap::default(),
+        vec![result]
+    );
+    contract.create_proposal_callback(
+        acct("creator.near"),
+        U128(5),
+        "t".to_string(),
+        "s".to_string(),
+        "b".to_string(),
+        "d".to_string(),
+        "e".to_string(),
+    )
+}
+
+#[test]
+fn create_proposal_callback_creates_when_threshold_is_met() {
+    let mut contract = new_contract();
+    let id = run_create_callback(
+        &mut contract,
+        PromiseResult::Successful("\"1000000\"".to_string().into_bytes()),
+    );
+    assert_eq!(id, Some(0));
+    assert_eq!(contract.proposals.len(), 1);
+    assert!(near_sdk::test_utils::get_created_receipts().is_empty());
+}
+
+#[test]
+fn create_proposal_callback_refunds_when_below_threshold() {
+    let mut contract = new_contract();
+    contract.min_voting_power_amount = 1_000;
+    let id = run_create_callback(
+        &mut contract,
+        PromiseResult::Successful("\"999\"".to_string().into_bytes()),
+    );
+    assert_eq!(id, None);
+    assert_eq!(contract.proposals.len(), 0);
+    let receipts = near_sdk::test_utils::get_created_receipts();
+    assert_eq!(receipts.len(), 1);
+    assert_eq!(receipts[0].receiver_id, acct("creator.near"));
+}
+
+#[test]
+fn create_proposal_callback_refunds_when_meta_vote_fails() {
+    let mut contract = new_contract();
+    let id = run_create_callback(&mut contract, PromiseResult::Failed);
+    assert_eq!(id, None);
+    assert_eq!(near_sdk::test_utils::get_created_receipts().len(), 1);
+}
