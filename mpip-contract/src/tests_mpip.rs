@@ -124,3 +124,30 @@ fn vote_callback_counts_a_single_vote() {
     contract.vote_proposal_callback(0, acct("alice.near"), VoteType::For, U128(0), String::new());
     assert_eq!(contract.internal_get_proposal_vote(0).for_votes, 500);
 }
+
+#[test]
+fn voting_reads_the_power_and_registers_the_sell_hold_in_metavote() {
+    let mut contract = contract_with_proposal();
+    let end_ms = T0 / 1_000_000 + 1_000_000;
+    let mut proposal = contract.internal_get_proposal(&0);
+    proposal.draft = false;
+    proposal.vote_start_timestamp = Some(T0 / 1_000_000 - 1);
+    proposal.vote_end_timestamp = Some(end_ms);
+    contract.proposals.insert(&0, &proposal);
+
+    testing_env!(builder("voter.near").build());
+    contract.vote_proposal(0, VoteType::For, "".to_string());
+
+    let receipts = near_sdk::test_utils::get_created_receipts();
+    let first = &receipts[0];
+    assert_eq!(first.receiver_id, acct("metavote.near"));
+    match &first.actions[0] {
+        near_sdk::mock::VmAction::FunctionCall { function_name, args, .. } => {
+            assert_eq!(function_name, "mpip_vote_power_and_hold");
+            let args = String::from_utf8(args.clone()).unwrap();
+            assert!(args.contains(&format!("\"hold_until_ms\":\"{}\"", end_ms)), "{}", args);
+            assert!(args.contains("voter.near"), "{}", args);
+        }
+        other => panic!("unexpected action {:?}", other),
+    }
+}
