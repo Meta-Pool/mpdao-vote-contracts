@@ -111,3 +111,81 @@ fn successful_transfer_subtracts_only_the_amount_sent() {
         2_000
     );
 }
+
+// ---- security: buy_lock_and_vote beneficiary / voting limit ----
+
+fn contract_with_near_buys() -> MetaVoteContract {
+    let mut contract = new_contract();
+    testing_env!(context("owner.near").attached_deposit(1).build());
+    contract.set_token_info(&near_as_account_id(), 24);
+    contract.enable_token(&near_as_account_id(), true);
+    contract.mpdao_avail_to_sell = 1_000_000 * ONE_MPDAO;
+    testing_env!(context("operator.near").attached_deposit(1).build());
+    contract.update_mpdao_prices(vec![buy_and_lock::UpdatePriceJsonItem {
+        token_contract: near_as_account_id(),
+        mpdao_per_token_e9: near_sdk::json_types::U64(462_768_483_257),
+        paused: false,
+    }]);
+    contract
+}
+
+fn buy(
+    contract: &mut MetaVoteContract,
+    who: &str,
+    near: u128,
+    beneficiary: Option<&str>,
+    addr: Option<&str>,
+) {
+    testing_env!(context(who).attached_deposit(near).build());
+    contract.buy_lock_and_vote(
+        30,
+        beneficiary.map(|s| s.to_string()),
+        addr.map(|s| s.to_string()),
+        addr.map(|_| "x".to_string()),
+    );
+}
+
+#[test]
+#[should_panic(expected = "Cannot vote on behalf of another account")]
+fn cannot_vote_as_beneficiary() {
+    let mut contract = contract_with_near_buys();
+    buy(&mut contract, "victim.near", ONE_NEAR, None, None);
+    buy(&mut contract, "attacker.near", ONE_NEAR, Some("victim.near"), Some("junk.near"));
+}
+
+#[test]
+#[should_panic(expected = "Minimum deposit amount")]
+fn near_buy_below_min_deposit_rejected() {
+    let mut contract = contract_with_near_buys();
+    buy(&mut contract, "attacker.near", ONE_NEAR / 100_000, Some("victim.near"), None);
+}
+
+#[test]
+fn gift_lock_without_vote_still_works() {
+    let mut contract = contract_with_near_buys();
+    buy(&mut contract, "dao.near", ONE_NEAR, Some("victim.near"), None);
+    assert_eq!(contract.internal_get_voter(&"victim.near".to_string()).locking_positions.len(), 1);
+}
+
+#[test]
+fn full_voter_can_still_add_votes_to_existing_address() {
+    let mut contract = contract_with_near_buys(); // max_voting_positions = 5
+    buy(&mut contract, "v.near", 10 * ONE_NEAR, None, None);
+    testing_env!(context("v.near").build());
+    for i in 0..5 {
+        contract.vote(U128(ONE_MPDAO), format!("a{}.near", i), "x".to_string());
+    }
+    // already at the max: more power on an existing address must work
+    contract.vote(U128(ONE_MPDAO), "a0.near".to_string(), "x".to_string());
+}
+
+#[test]
+#[should_panic(expected = "Cannot exceed 5 voting positions")]
+fn full_voter_cannot_add_new_address() {
+    let mut contract = contract_with_near_buys();
+    buy(&mut contract, "v.near", 10 * ONE_NEAR, None, None);
+    testing_env!(context("v.near").build());
+    for i in 0..6 {
+        contract.vote(U128(ONE_MPDAO), format!("a{}.near", i), "x".to_string());
+    }
+}
