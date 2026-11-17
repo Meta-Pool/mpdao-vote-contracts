@@ -46,7 +46,7 @@ fn operator_confirms_expected_account() {
     let mut contract = new_contract();
     pre_delegate(&mut contract, "alice.near");
     testing_env!(context("operator.near").attached_deposit(1).build());
-    contract.operator_confirm_delegated_evm_address(ETH.to_string(), "alice.near".to_string());
+    contract.operator_confirm_delegated_evm_address(ETH.to_string(), "alice.near".to_string(), "sig-alice.near".to_string());
     assert_eq!(
         contract.evm_delegates.get(&"alice.near".to_string()).unwrap(),
         vec![ETH.to_string()]
@@ -61,5 +61,25 @@ fn overwritten_pre_delegation_is_not_confirmed() {
     // attacker overwrites the entry after the operator verified alice's signature
     pre_delegate(&mut contract, "mallory.near");
     testing_env!(context("operator.near").attached_deposit(1).build());
-    contract.operator_confirm_delegated_evm_address(ETH.to_string(), "alice.near".to_string());
+    contract.operator_confirm_delegated_evm_address(
+        ETH.to_string(),
+        "alice.near".to_string(),
+        "sig-alice.near".to_string(),
+    );
+}
+
+#[test]
+#[should_panic(expected = "is not the one that was verified")]
+fn same_account_with_swapped_signature_is_not_confirmed() {
+    let mut contract = new_contract();
+    pre_delegate(&mut contract, "alice.near");
+    // alice (the verified account) replaces her signature after the operator checked it
+    testing_env!(context("alice.near").attached_deposit(1).build());
+    contract.pre_delegate_evm_address(ETH.to_string(), "invalid-sig".to_string());
+    testing_env!(context("operator.near").attached_deposit(1).build());
+    contract.operator_confirm_delegated_evm_address(
+        ETH.to_string(),
+        "alice.near".to_string(),
+        "sig-alice.near".to_string(),
+    );
 }
