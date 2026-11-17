@@ -17,7 +17,7 @@ DELEGATE="asimov.testnet"
 #     --useAccount $DELEGATE --depositYocto 1 
 
 # NEAR_ENV=testnet near call $METAVOTE_CONTRACT_ADDRESS \
-# operator_confirm_delegated_evm_address '{"evm_address":"'$EVM_ADDRESS_ACC0'","expected_account_id":"'$DELEGATE'"}' \
+# operator_confirm_delegated_evm_address '{"evm_address":"'$EVM_ADDRESS_ACC0'","expected_account_id":"'$DELEGATE'","expected_signature":"xx"}' \
 #     --useAccount $OPERATOR_ID --depositYocto 1 
 
 # REMOVE DELEGATION

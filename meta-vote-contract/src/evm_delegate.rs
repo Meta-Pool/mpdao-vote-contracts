@@ -34,13 +34,14 @@ impl MetaVoteContract {
     }
 
     #[payable]
-    /// `expected_account_id` is the account the operator verified (off-chain) the signature for.
-    /// The pre-delegation can be overwritten by anyone between that check and this call,
-    /// so it is only confirmed if it still belongs to the expected account.
+    /// `expected_account_id` and `expected_signature` are the delegate and the signature the
+    /// operator verified (off-chain). The pre-delegation can be overwritten by anyone between
+    /// that check and this call, so it is only confirmed if it is still exactly that record.
     pub fn operator_confirm_delegated_evm_address(
         &mut self,
         evm_address: String,
         expected_account_id: String,
+        expected_signature: String,
     ) {
         assert_one_yocto();
         self.assert_operator();
@@ -51,6 +52,11 @@ impl MetaVoteContract {
                 evm_address,
                 pre_delegation.0,
                 expected_account_id
+            );
+            assert!(
+                pre_delegation.1 == expected_signature,
+                "Pre-delegation signature for {} is not the one that was verified",
+                evm_address
             );
         }
         if let Some(pre_delegation) = self.evm_pre_delegation.remove(&evm_address) {
