@@ -453,10 +453,17 @@ impl MetaVoteContract {
         let unbond_days = optional_unbond_days.unwrap_or(0);
         if unbond_days > 0 {
             self.assert_min_deposit_amount(amount);
-            // get beneficiary voter
-            let mut beneficiary_voter = self.internal_get_voter(&voter_id);
+            // the lock goes to the receiver (the caller), not to the claim owner:
+            // for EVM-delegated claims the owner is a pseudo account nobody controls
+            let beneficiary_id = receiver_id.to_string();
+            let mut beneficiary_voter = self.internal_get_voter(&beneficiary_id);
             // create/update locking position
-            self.deposit_locking_position(amount, unbond_days, &voter_id, &mut beneficiary_voter);
+            self.deposit_locking_position(
+                amount,
+                unbond_days,
+                &beneficiary_id,
+                &mut beneficiary_voter,
+            );
             // return 0
             PromiseOrValue::Value(0)
         } else {
