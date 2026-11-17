@@ -685,8 +685,11 @@ impl MetaVoteContract {
             voter.available_voting_power,
             voting_power
         );
+        // The limit only applies when this vote would create a NEW contract_address entry.
+        // Adding votes to an address the voter already uses must always be possible.
         assert!(
-            voter.vote_positions.len() <= self.max_voting_positions as u64,
+            voter.vote_positions.get(contract_address).is_some()
+                || voter.vote_positions.len() < self.max_voting_positions as u64,
             "Cannot exceed {} voting positions.",
             self.max_voting_positions
         );

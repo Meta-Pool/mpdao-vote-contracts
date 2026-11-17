@@ -268,6 +268,8 @@ impl MetaVoteContract {
         // compute how much mpDAO to give for token_and_amount
         let mpdao_amount = token_info.compute_mpdao_amount(token_and_amount.amount, &price);
         require!(mpdao_amount > 0, "mpDAO amount to buy is zero");
+        // same minimum as the direct mpDAO deposit path
+        self.assert_min_deposit_amount(mpdao_amount);
         // enough mpDAO to sell?
         require!(
             self.mpdao_avail_to_sell >= mpdao_amount,
@@ -318,6 +320,12 @@ impl MetaVoteContract {
             options.contract_address.clone(),
             options.votable_object_id.clone(),
         ) {
+            // Voting spends the voter's voting power and fills the voter's vote slots,
+            // so only the voter itself can vote. Locking for others is allowed, voting for others is not.
+            require!(
+                voter_id == sender_id.to_string(),
+                "Cannot vote on behalf of another account. Do not combine beneficiary with vote options."
+            );
             let voting_power = utils::calculate_voting_power(mpdao_amount, options.days);
             self.internal_vote(
                 &voter_id,
