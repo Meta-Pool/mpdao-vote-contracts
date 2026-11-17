@@ -406,10 +406,16 @@ impl MpipContract {
     ) {
         self.assert_proposal_is_on_voting(&mpip_id);
         self.assert_has_not_voted(mpip_id, env::predecessor_account_id());
+        // The voting power is read AND held in MetaVote in the same call: until the ballot ends the
+        // voter cannot sell the position that backs this vote (prevents vote recycling).
+        let hold_until_ms = self
+            .internal_get_proposal(&mpip_id)
+            .vote_end_timestamp
+            .unwrap_or_default();
         ext_metavote::ext(self.meta_vote_contract_address.clone())
             .with_static_gas(GAS_FOR_GET_VOTING_POWER)
             .with_attached_deposit(1)
-            .get_mpip_voting_power(env::predecessor_account_id())
+            .mpip_vote_power_and_hold(env::predecessor_account_id(), U64(hold_until_ms))
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE_VOTE)
