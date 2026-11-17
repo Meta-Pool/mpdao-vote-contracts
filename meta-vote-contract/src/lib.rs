@@ -34,8 +34,11 @@ mod tests_unlock;
 #[cfg(test)]
 mod tests_realize;
 #[cfg(test)]
+mod tests_mpip_hold;
+#[cfg(test)]
 mod tests_withdraw;
 mod locking_position;
+mod mpip_hold;
 mod migrate;
 mod realize_mirror;
 mod sell_position;

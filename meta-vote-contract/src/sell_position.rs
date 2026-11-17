@@ -438,6 +438,7 @@ impl MetaVoteContract {
         assert_one_yocto();
         let seller = env::predecessor_account_id();
         let voter_id = seller.to_string();
+        Self::assert_not_on_mpip_hold(&voter_id);
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         let position = voter.get_position(index);
         require!(
