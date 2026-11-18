@@ -778,6 +778,8 @@ impl MetaVoteContract {
             }
         } else {
             // Decrease votes.
+            // Same freeze as unvote: a partial decrease must not bypass it.
+            self.assert_votes_not_frozen(&contract_address, &votable_object_id);
             // Reducing a delegation must wait 7 days since the last refresh, like unvote.
             // The timestamp is NOT refreshed here: removing votes must not restart the clock.
             if contract_address == DELEGATED_CONTRACT_CODE {
@@ -920,20 +922,14 @@ impl MetaVoteContract {
         );
     }
 
-    fn internal_unvote(
-        &mut self,
-        voter_id: &String,
+    /// Votes can be frozen by the operator (for example last 48hs of grants voting up to 20 days
+    /// after). While the freeze is armed for (address, numeric id) NO path may reduce a matching
+    /// vote: neither a full removal (`unvote`) nor a partial decrease (`rebalance`).
+    pub(crate) fn assert_votes_not_frozen(
+        &self,
         contract_address: &ContractAddress,
         votable_object_id: &VotableObjId,
-        bypass_delegation_restriction: bool,
     ) {
-        // verify if unvoting delegated vote: must wait at least 7 days since last refresh
-        // (unless bypassing the restriction, e.g., for operator cleanup of stale votes)
-        if contract_address == DELEGATED_CONTRACT_CODE && !bypass_delegation_restriction {
-            self.assert_delegation_decrease_allowed(voter_id, contract_address, votable_object_id);
-        }
-
-        // verify if the votes are locked (for example last 48hs of grants voting up to 20 days after)
         if let Some(lock_votes_in_address) = &self.lock_votes_in_address {
             if self.lock_votes_in_end_timestamp_ms > env::block_timestamp_ms()
                 && lock_votes_in_address == contract_address
@@ -947,6 +943,22 @@ impl MetaVoteContract {
                 }
             }
         }
+    }
+
+    fn internal_unvote(
+        &mut self,
+        voter_id: &String,
+        contract_address: &ContractAddress,
+        votable_object_id: &VotableObjId,
+        bypass_delegation_restriction: bool,
+    ) {
+        // verify if unvoting delegated vote: must wait at least 7 days since last refresh
+        // (unless bypassing the restriction, e.g., for operator cleanup of stale votes)
+        if contract_address == DELEGATED_CONTRACT_CODE && !bypass_delegation_restriction {
+            self.assert_delegation_decrease_allowed(voter_id, contract_address, votable_object_id);
+        }
+
+        self.assert_votes_not_frozen(contract_address, votable_object_id);
 
         let mut voter = self.internal_get_voter_or_panic(&voter_id);
         self.internal_remove_voting_position(
