@@ -34,6 +34,8 @@ mod tests_unlock;
 #[cfg(test)]
 mod tests_realize;
 #[cfg(test)]
+mod tests_claim_unlocked;
+#[cfg(test)]
 mod tests_withdraw;
 mod locking_position;
 mod migrate;
