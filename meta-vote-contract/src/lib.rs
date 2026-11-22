@@ -38,6 +38,8 @@ mod tests_evm_delegate;
 #[cfg(test)]
 mod tests_claim_unlocked;
 #[cfg(test)]
+mod tests_sell_rollback;
+#[cfg(test)]
 mod tests_withdraw;
 mod locking_position;
 mod migrate;
