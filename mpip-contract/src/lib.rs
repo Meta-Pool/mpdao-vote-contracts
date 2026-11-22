@@ -5,7 +5,9 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::unordered_map::UnorderedMap;
 use near_sdk::json_types::U128;
 use near_sdk::json_types::U64;
-use near_sdk::{env, log, near_bindgen, require, AccountId, Balance, PanicOnDefault, Promise};
+use near_sdk::{
+    env, log, near_bindgen, require, AccountId, Balance, PanicOnDefault, Promise, PromiseResult,
+};
 use types::*;
 use utils::get_current_epoch_millis;
 use vote::{Vote, VoteJson, VoteType};
@@ -508,6 +510,63 @@ impl MpipContract {
         }
     }
 
+    /// Re-read one voter's current MetaVote power and lower this vote if it fell.
+    /// The recorded power is never raised. A bot calls this for a voter it already
+    /// saw sell, so the tally is corrected before the ballot ends.
+    pub fn adjust_vote_tally(&mut self, mpip_id: MpipId, voter_id: AccountId) {
+        let proposal = self.internal_get_proposal(&mpip_id);
+        require!(!proposal.executed, "Proposal is already executed");
+        require!(!proposal.canceled, "Proposal is canceled");
+        self.assert_has_voted(mpip_id, voter_id.clone());
+        ext_metavote::ext(self.meta_vote_contract_address.clone())
+            .with_static_gas(GAS_FOR_GET_VOTING_POWER)
+            .with_attached_deposit(1)
+            .get_mpip_voting_power(voter_id.clone())
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_RESOLVE_VOTE)
+                    .adjust_vote_tally_callback(mpip_id, voter_id),
+            );
+    }
+
+    #[private]
+    pub fn adjust_vote_tally_callback(&mut self, mpip_id: MpipId, voter_id: AccountId) {
+        let current = self.internal_get_user_total_voting_power_from_promise();
+        self.apply_lower_vote_power(mpip_id, &voter_id, current);
+    }
+
+    /// Lower one recorded vote to `current` MetaVote power. Never raises it.
+    fn apply_lower_vote_power(&mut self, mpip_id: MpipId, voter_id: &AccountId, current: u128) {
+        let proposal = self.internal_get_proposal(&mpip_id);
+        if proposal.executed || proposal.canceled || !self.internal_has_voted(&mpip_id, voter_id) {
+            return;
+        }
+        let mut proposal_vote = self.internal_get_proposal_vote(mpip_id);
+        let mut user_vote = proposal_vote.has_voted.get(voter_id).unwrap();
+        if current >= user_vote.voting_power {
+            return;
+        }
+        let delta = user_vote.voting_power - current;
+        match user_vote.vote_type {
+            VoteType::For => proposal_vote.for_votes -= delta,
+            VoteType::Against => proposal_vote.against_votes -= delta,
+            VoteType::Abstain => proposal_vote.abstain_votes -= delta,
+        }
+        user_vote.voting_power = current;
+        proposal_vote.has_voted.insert(voter_id, &user_vote);
+        self.votes.insert(&mpip_id, &proposal_vote);
+        let mut voter = self.internal_get_voter(voter_id);
+        voter.votes.insert(&mpip_id, &user_vote);
+        self.voters.insert(voter_id, &voter);
+        log!(
+            "Adjusted {} vote on proposal {} down by {} to {}",
+            voter_id,
+            mpip_id,
+            delta,
+            current
+        );
+    }
+
     pub fn has_voted(&self, voter_id: AccountId, mpip_id: MpipId) -> bool {
         self.internal_has_voted(&mpip_id, &voter_id)
     }
@@ -532,18 +591,110 @@ impl MpipContract {
     // * BOT FUNCTIONS *
     // *********
 
+    /// After the ballot ends, re-read each voter's current MetaVote power, lower any
+    /// vote that dropped, then mark the proposal executed if quorum still holds.
+    /// One call covers `RECONCILE_BATCH` voters. When the log asks to continue,
+    /// call `process_voting_status_from` with that index. Attach at least 130 Tgas.
     pub fn process_voting_status(&mut self, mpip_id: MpipId) {
         self.assert_only_operator();
-        if !self.internal_proposal_is_on_voting(&mpip_id) {
+        self.internal_reconcile_and_close(mpip_id, 0);
+    }
+
+    pub fn process_voting_status_from(&mut self, mpip_id: MpipId, from_index: u64) {
+        self.assert_only_operator();
+        self.internal_reconcile_and_close(mpip_id, from_index);
+    }
+
+    fn internal_reconcile_and_close(&mut self, mpip_id: MpipId, from_index: u64) {
+        let proposal = self.internal_get_proposal(&mpip_id);
+        if proposal.executed || proposal.canceled || proposal.draft {
             return;
         }
+        let end = match proposal.vote_end_timestamp {
+            Some(end) => end,
+            None => return,
+        };
+        if get_current_epoch_millis() < end {
+            return;
+        }
+        let proposal_vote = self.internal_get_proposal_vote(mpip_id);
+        let keys = proposal_vote.has_voted.keys_as_vector();
+        let len = keys.len();
+        if len == 0 {
+            self.close_proposal_if_quorum(mpip_id);
+            return;
+        }
+        require!(from_index < len, "from_index is past the last voter");
+        let batch_end = std::cmp::min(len, from_index + RECONCILE_BATCH);
+        let mut voter_ids = Vec::with_capacity((batch_end - from_index) as usize);
+        let mut reads: Option<Promise> = None;
+        for index in from_index..batch_end {
+            let voter_id = keys.get(index).expect("voter key");
+            let read = ext_metavote::ext(self.meta_vote_contract_address.clone())
+                .with_static_gas(GAS_FOR_GET_VOTING_POWER)
+                .with_attached_deposit(1)
+                .get_mpip_voting_power(voter_id.clone());
+            reads = Some(match reads {
+                Some(prev) => prev.and(read),
+                None => read,
+            });
+            voter_ids.push(voter_id);
+        }
+        reads.unwrap().then(
+            Self::ext(env::current_account_id())
+                .with_static_gas(GAS_FOR_RECONCILE_CALLBACK)
+                .reconcile_votes_for_close_callback(mpip_id, voter_ids, batch_end),
+        );
+    }
+
+    #[private]
+    pub fn reconcile_votes_for_close_callback(
+        &mut self,
+        mpip_id: MpipId,
+        voter_ids: Vec<AccountId>,
+        next_index: u64,
+    ) {
+        require!(
+            env::promise_results_count() == voter_ids.len() as u64,
+            "Missing MetaVote results"
+        );
+        for (index, voter_id) in voter_ids.iter().enumerate() {
+            let current = match env::promise_result(index as u64) {
+                PromiseResult::Successful(result) => {
+                    near_sdk::serde_json::from_slice::<U128>(&result)
+                        .expect("Bad voting power")
+                        .0
+                }
+                PromiseResult::Failed => env::panic_str("Meta Vote is not available!"),
+                PromiseResult::NotReady => unreachable!(),
+            };
+            self.apply_lower_vote_power(mpip_id, voter_id, current);
+        }
+        let total = self.internal_get_proposal_vote(mpip_id).has_voted.len();
+        if next_index >= total {
+            self.close_proposal_if_quorum(mpip_id);
+        } else {
+            log!(
+                "Reconciled votes before index {}. Call process_voting_status_from({}, {}) to continue.",
+                next_index,
+                mpip_id,
+                next_index
+            );
+        }
+    }
+
+    fn close_proposal_if_quorum(&mut self, mpip_id: MpipId) {
         let mut proposal = self.internal_get_proposal(&mpip_id);
-        if get_current_epoch_millis() >= proposal.vote_end_timestamp.unwrap() {
-            if self.internal_is_quorum_reached(mpip_id) {
-                // TODO EXECUTE
-                proposal.executed = true;
-                self.proposals.insert(&mpip_id, &proposal);
-            }
+        if proposal.executed || proposal.canceled {
+            return;
+        }
+        if self.internal_is_quorum_reached(mpip_id) {
+            // TODO EXECUTE
+            proposal.executed = true;
+            self.proposals.insert(&mpip_id, &proposal);
+            log!("Proposal {} executed", mpip_id);
+        } else {
+            log!("Proposal {} quorum not reached after reconcile", mpip_id);
         }
     }
 }

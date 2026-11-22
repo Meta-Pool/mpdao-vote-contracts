@@ -124,3 +124,118 @@ fn vote_callback_counts_a_single_vote() {
     contract.vote_proposal_callback(0, acct("alice.near"), VoteType::For, U128(0), String::new());
     assert_eq!(contract.internal_get_proposal_vote(0).for_votes, 500);
 }
+
+fn contract_with_alice_vote() -> MpipContract {
+    let mut contract = contract_with_proposal();
+    with_promise_result("1000");
+    contract.start_voting_period_callback(0);
+    with_promise_result("500");
+    contract.vote_proposal_callback(0, acct("alice.near"), VoteType::For, U128(0), String::new());
+    contract
+}
+
+#[test]
+fn adjust_lowers_the_tally_when_the_voter_sold() {
+    let mut contract = contract_with_alice_vote();
+    with_promise_result("200");
+    contract.adjust_vote_tally_callback(0, acct("alice.near"));
+    assert_eq!(contract.internal_get_proposal_vote(0).for_votes, 200);
+    assert_eq!(
+        contract.internal_get_voter_vote(&0, &acct("alice.near")).voting_power,
+        200
+    );
+}
+
+#[test]
+fn adjust_does_not_raise_the_tally_when_power_grew() {
+    let mut contract = contract_with_alice_vote();
+    with_promise_result("900");
+    contract.adjust_vote_tally_callback(0, acct("alice.near"));
+    assert_eq!(contract.internal_get_proposal_vote(0).for_votes, 500);
+    assert_eq!(
+        contract.internal_get_voter_vote(&0, &acct("alice.near")).voting_power,
+        500
+    );
+}
+
+fn after_the_ballot(predecessor: &str) {
+    let end_ms = T0 / 1_000_000 + 7 * 24 * 3600 * 1000;
+    testing_env!(builder(predecessor)
+        .block_timestamp((end_ms + 1) * 1_000_000)
+        .build());
+}
+
+#[test]
+fn close_lowers_a_sold_vote_and_does_not_execute_without_quorum() {
+    let mut contract = contract_with_alice_vote();
+    after_the_ballot("mpip.near");
+    with_promise_result("0");
+    contract.reconcile_votes_for_close_callback(0, vec![acct("alice.near")], 1);
+    assert_eq!(contract.internal_get_proposal_vote(0).for_votes, 0);
+    assert!(!contract.internal_get_proposal(&0).executed);
+}
+
+#[test]
+fn close_executes_when_the_voter_still_has_the_recorded_power() {
+    let mut contract = contract_with_alice_vote();
+    after_the_ballot("mpip.near");
+    with_promise_result("500");
+    contract.reconcile_votes_for_close_callback(0, vec![acct("alice.near")], 1);
+    assert!(contract.internal_get_proposal(&0).executed);
+    assert_eq!(contract.internal_get_proposal_vote(0).for_votes, 500);
+}
+
+#[test]
+fn close_waits_for_the_next_batch_before_executing() {
+    let mut contract = contract_with_alice_vote();
+    with_promise_result("400");
+    contract.vote_proposal_callback(0, acct("bob.near"), VoteType::For, U128(0), String::new());
+    after_the_ballot("mpip.near");
+    with_promise_result("500");
+    contract.reconcile_votes_for_close_callback(0, vec![acct("alice.near")], 1);
+    assert!(!contract.internal_get_proposal(&0).executed);
+}
+
+#[test]
+fn close_reads_metavote_after_the_ballot_ends() {
+    let mut contract = contract_with_alice_vote();
+    after_the_ballot("operator.near");
+    contract.process_voting_status(0);
+    let receipts = near_sdk::test_utils::get_created_receipts();
+    match &receipts[0].actions[0] {
+        near_sdk::mock::VmAction::FunctionCall { function_name, args, .. } => {
+            assert_eq!(function_name, "get_mpip_voting_power");
+            let args = String::from_utf8(args.clone()).unwrap();
+            assert!(args.contains("alice.near"), "{}", args);
+        }
+        other => panic!("unexpected action {:?}", other),
+    }
+    assert!(!contract.internal_get_proposal(&0).executed);
+}
+
+#[test]
+fn close_does_nothing_while_the_ballot_is_open() {
+    let mut contract = contract_with_alice_vote();
+    testing_env!(builder("operator.near").build());
+    contract.process_voting_status(0);
+    assert!(near_sdk::test_utils::get_created_receipts().is_empty());
+    assert!(!contract.internal_get_proposal(&0).executed);
+}
+
+#[test]
+fn adjust_reads_the_voters_current_power_from_metavote() {
+    let mut contract = contract_with_alice_vote();
+    testing_env!(builder("bot.near").build());
+    contract.adjust_vote_tally(0, acct("alice.near"));
+    let receipts = near_sdk::test_utils::get_created_receipts();
+    let first = &receipts[0];
+    assert_eq!(first.receiver_id, acct("metavote.near"));
+    match &first.actions[0] {
+        near_sdk::mock::VmAction::FunctionCall { function_name, args, .. } => {
+            assert_eq!(function_name, "get_mpip_voting_power");
+            let args = String::from_utf8(args.clone()).unwrap();
+            assert!(args.contains("alice.near"), "{}", args);
+        }
+        other => panic!("unexpected action {:?}", other),
+    }
+}
