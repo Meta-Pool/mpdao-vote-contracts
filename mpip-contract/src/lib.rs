@@ -234,6 +234,7 @@ impl MpipContract {
                     .with_static_gas(GAS_FOR_RESOLVE_VOTE)
                     .create_proposal_callback(
                         env::predecessor_account_id(),
+                        U128(env::attached_deposit()),
                         title,
                         short_description,
                         body,
@@ -243,21 +244,46 @@ impl MpipContract {
             );
     }
 
+    /// Returns the new proposal id, or `None` if the proposal was not created
+    /// (Meta Vote unavailable or voting power below the threshold). In that case the
+    /// whole deposit attached to `create_proposal` is refunded to the creator.
     #[private]
     pub fn create_proposal_callback(
         &mut self,
         creator_id: AccountId,
+        deposit: U128,
         title: String,
         short_description: String,
         body: String,
         data: String,
         extra: String,
-    ) -> MpipId {
-        let total_v_power = self.internal_get_user_total_voting_power_from_promise();
-        self.assert_proposal_threshold(total_v_power);
-        let id = self.proposals.len() as MpipId;
-        self.internal_create_proposal(id, creator_id, title, short_description, body, data, extra);
-        id
+    ) -> Option<MpipId> {
+        let total_v_power = match env::promise_result(0) {
+            PromiseResult::Successful(result) => {
+                near_sdk::serde_json::from_slice::<U128>(&result).ok().map(|v| v.0)
+            }
+            _ => None,
+        };
+        match total_v_power {
+            Some(v_power) if self.internal_check_proposal_threshold(v_power) => {
+                let id = self.proposals.len() as MpipId;
+                self.internal_create_proposal(
+                    id, creator_id, title, short_description, body, data, extra,
+                );
+                Some(id)
+            }
+            _ => {
+                log!(
+                    "Proposal not created for {}. Refunding {} yoctoNEAR",
+                    creator_id,
+                    deposit.0
+                );
+                if deposit.0 > 0 {
+                    Promise::new(creator_id).transfer(deposit.0);
+                }
+                None
+            }
+        }
     }
 
     pub fn cancel_proposal(&mut self, mpip_id: MpipId) {
