@@ -140,3 +140,74 @@ fn delegator_cannot_force_undelegate() {
         "bob.near".to_string(),
     )]);
 }
+
+// ---- vote freeze (lock_votes_in) must hold for partial decreases too ----
+
+const GRANTS: &str = "initiatives";
+const FROZEN_OBJ: &str = "grant #11 final";
+const OTHER_OBJ: &str = "grant #12 final";
+
+fn contract_with_frozen_vote(freeze_end_ms: u64) -> (MetaVoteContract, u128) {
+    let mut contract = new_contract();
+    let voter_id = "carol.near".to_string();
+    let mut voter = contract.internal_get_voter(&voter_id);
+    contract.internal_create_locking_position(&mut voter, 100 * ONE_MPDAO, 60);
+    contract.voters.insert(&voter_id, &voter);
+    let power = contract.internal_get_voter(&voter_id).available_voting_power;
+    testing_env!(context("carol.near").build());
+    contract.vote(U128(power / 2), GRANTS.to_string(), FROZEN_OBJ.to_string());
+    contract.vote(U128(power - power / 2), GRANTS.to_string(), OTHER_OBJ.to_string());
+    testing_env!(context("operator.near").build());
+    contract.set_lock_in_vote_filters(freeze_end_ms, 11, Some(GRANTS.to_string()));
+    (contract, power)
+}
+
+fn frozen_until() -> u64 {
+    T0 / 1_000_000 + 20 * 24 * 3600 * 1000
+}
+
+#[test]
+#[should_panic(expected = "you can not remove votes here until timestamp_ms")]
+fn unvote_is_blocked_by_the_freeze() {
+    let (mut contract, _) = contract_with_frozen_vote(frozen_until());
+    testing_env!(context("carol.near").build());
+    contract.unvote(GRANTS.to_string(), FROZEN_OBJ.to_string());
+}
+
+#[test]
+#[should_panic(expected = "you can not remove votes here until timestamp_ms")]
+fn partial_rebalance_decrease_is_blocked_by_the_freeze() {
+    let (mut contract, _) = contract_with_frozen_vote(frozen_until());
+    testing_env!(context("carol.near").build());
+    contract.rebalance(U128(1), GRANTS.to_string(), FROZEN_OBJ.to_string());
+}
+
+#[test]
+#[should_panic(expected = "you can not remove votes here until timestamp_ms")]
+fn rebalance_to_zero_is_blocked_by_the_freeze() {
+    let (mut contract, _) = contract_with_frozen_vote(frozen_until());
+    testing_env!(context("carol.near").build());
+    contract.rebalance(U128(0), GRANTS.to_string(), FROZEN_OBJ.to_string());
+}
+
+#[test]
+fn rebalance_decrease_on_another_object_is_not_affected_by_the_freeze() {
+    let (mut contract, power) = contract_with_frozen_vote(frozen_until());
+    testing_env!(context("carol.near").build());
+    contract.rebalance(U128(1), GRANTS.to_string(), OTHER_OBJ.to_string());
+    assert_eq!(
+        contract.internal_get_voter(&"carol.near".to_string()).available_voting_power,
+        power - power / 2 - 1
+    );
+}
+
+#[test]
+fn rebalance_decrease_works_after_the_freeze_ends() {
+    let (mut contract, power) = contract_with_frozen_vote(frozen_until());
+    testing_env!(context_at("carol.near", (frozen_until() + 1) * 1_000_000).build());
+    contract.rebalance(U128(1), GRANTS.to_string(), FROZEN_OBJ.to_string());
+    assert_eq!(
+        contract.internal_get_voter(&"carol.near".to_string()).available_voting_power,
+        power / 2 - 1
+    );
+}
