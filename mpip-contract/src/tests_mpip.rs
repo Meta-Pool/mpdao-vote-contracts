@@ -239,3 +239,54 @@ fn adjust_reads_the_voters_current_power_from_metavote() {
         other => panic!("unexpected action {:?}", other),
     }
 }
+
+#[test]
+#[should_panic(expected = "body is too long")]
+fn update_proposal_rejects_oversized_body() {
+    let mut contract = contract_with_proposal();
+    testing_env!(builder("creator.near").build());
+    contract.update_proposal(
+        0,
+        "t".to_string(),
+        "s".to_string(),
+        "x".repeat(MAX_BODY_LEN + 1),
+        "d".to_string(),
+        "e".to_string(),
+    );
+}
+
+#[test]
+#[should_panic(expected = "title is too long")]
+fn create_proposal_rejects_oversized_title() {
+    let mut contract = new_contract();
+    testing_env!(builder("creator.near").attached_deposit(10).build());
+    contract.create_proposal(
+        "x".repeat(MAX_TITLE_LEN + 1),
+        "s".to_string(),
+        "b".to_string(),
+        "d".to_string(),
+        "e".to_string(),
+    );
+}
+
+#[test]
+#[should_panic(expected = "memo is too long")]
+fn vote_rejects_oversized_memo() {
+    let mut contract = contract_with_proposal();
+    testing_env!(builder("voter.near").build());
+    contract.vote_proposal(0, VoteType::Against, "x".repeat(MAX_MEMO_LEN + 1));
+}
+
+#[test]
+fn update_proposal_accepts_max_sized_fields() {
+    let mut contract = contract_with_proposal();
+    testing_env!(builder("creator.near").build());
+    contract.update_proposal(
+        0,
+        "x".repeat(MAX_TITLE_LEN),
+        "s".to_string(),
+        "x".repeat(MAX_BODY_LEN),
+        "d".to_string(),
+        "e".to_string(),
+    );
+}

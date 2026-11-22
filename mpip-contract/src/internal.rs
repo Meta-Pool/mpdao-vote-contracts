@@ -210,6 +210,27 @@ impl MpipContract {
             .unwrap_or(Vec::<MpipId>::new())
     }
 
+    pub(crate) fn assert_proposal_fields_len(
+        title: &str,
+        short_description: &str,
+        body: &str,
+        data: &str,
+        extra: &str,
+    ) {
+        require!(title.len() <= MAX_TITLE_LEN, "title is too long");
+        require!(
+            short_description.len() <= MAX_SHORT_DESCRIPTION_LEN,
+            "short_description is too long"
+        );
+        require!(body.len() <= MAX_BODY_LEN, "body is too long");
+        require!(data.len() <= MAX_DATA_LEN, "data is too long");
+        require!(extra.len() <= MAX_EXTRA_LEN, "extra is too long");
+    }
+
+    pub(crate) fn assert_memo_len(memo: &str) {
+        require!(memo.len() <= MAX_MEMO_LEN, "memo is too long");
+    }
+
     pub(crate) fn assert_proposal_storage_is_covered(&self) {
         assert!(
             env::attached_deposit() >= self.mpip_storage_near,
