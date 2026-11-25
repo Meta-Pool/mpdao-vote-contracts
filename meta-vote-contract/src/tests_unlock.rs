@@ -80,7 +80,7 @@ fn unlock_partial_position_after_unlock_panics() {
 }
 
 #[test]
-fn operator_can_repair_total_voting_power() {
+fn locked_voting_power_page_sums_locked_positions() {
     let mut contract = new_contract();
     add_voter(&mut contract, "alice.near");
     add_voter(&mut contract, "bob.near");
@@ -88,17 +88,4 @@ fn operator_can_repair_total_voting_power() {
         + crate::utils::calculate_voting_power(100 * ONE_MPDAO, 120);
     let page_total = contract.get_locked_voting_power_page(0, 10).0;
     assert_eq!(page_total, per_voter * 2);
-
-    contract.total_voting_power = 0; // drained by repeated unlocks
-    testing_env!(context("operator.near").build());
-    contract.operator_set_total_voting_power(U128(page_total));
-    assert_eq!(contract.total_voting_power, page_total);
-}
-
-#[test]
-#[should_panic(expected = "Only the operator can call this function.")]
-fn only_operator_can_set_total_voting_power() {
-    let mut contract = new_contract();
-    testing_env!(context("alice.near").build());
-    contract.operator_set_total_voting_power(U128(1));
 }

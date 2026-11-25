@@ -79,7 +79,7 @@ fn fill_all_locking_slots(contract: &mut MetaVoteContract) {
         testing_env!(context("mpdao.near").build());
         contract.ft_on_transfer(
             acct("gifter.near"),
-            U128(ONE_MPDAO),
+            U128(MIN_GIFT_LOCK),
             format!("[\"alice.near\",{days}]"),
         );
     }

@@ -1,4 +1,5 @@
 use crate::*;
+use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::json_types::U128;
 use near_sdk::test_utils::VMContextBuilder;
 use near_sdk::{testing_env, PromiseResult, RuntimeFeesConfig, VMConfig};
@@ -146,11 +147,29 @@ fn buy(
 }
 
 #[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn set_token_info_requires_one_yocto() {
+    let mut contract = new_contract();
+    testing_env!(context("owner.near").build());
+    contract.set_token_info(&near_as_account_id(), 24);
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn enable_token_requires_one_yocto() {
+    let mut contract = new_contract();
+    testing_env!(context("owner.near").attached_deposit(1).build());
+    contract.set_token_info(&near_as_account_id(), 24);
+    testing_env!(context("owner.near").build());
+    contract.enable_token(&near_as_account_id(), true);
+}
+
+#[test]
 #[should_panic(expected = "Cannot vote on behalf of another account")]
 fn cannot_vote_as_beneficiary() {
     let mut contract = contract_with_near_buys();
     buy(&mut contract, "victim.near", ONE_NEAR, None, None);
-    buy(&mut contract, "attacker.near", ONE_NEAR, Some("victim.near"), Some("junk.near"));
+    buy(&mut contract, "attacker.near", 3 * ONE_NEAR, Some("victim.near"), Some("junk.near"));
 }
 
 #[test]
@@ -161,10 +180,58 @@ fn near_buy_below_min_deposit_rejected() {
 }
 
 #[test]
+#[should_panic(expected = "Minimum lock for another account is 1000 mpDAO.")]
+fn gift_below_1000_mpdao_is_rejected() {
+    let mut contract = contract_with_near_buys();
+    // 1 NEAR buys about 463 mpDAO at the test price, above the self-deposit minimum.
+    buy(&mut contract, "dao.near", ONE_NEAR, Some("victim.near"), None);
+}
+
+#[test]
 fn gift_lock_without_vote_still_works() {
     let mut contract = contract_with_near_buys();
-    buy(&mut contract, "dao.near", ONE_NEAR, Some("victim.near"), None);
+    // 3 NEAR buys about 1,388 mpDAO, above the 1,000 mpDAO gift minimum.
+    buy(&mut contract, "dao.near", 3 * ONE_NEAR, Some("victim.near"), None);
     assert_eq!(contract.internal_get_voter(&"victim.near".to_string()).locking_positions.len(), 1);
+}
+
+#[test]
+fn self_buy_below_1000_mpdao_still_works() {
+    let mut contract = contract_with_near_buys();
+    buy(&mut contract, "dao.near", ONE_NEAR, None, None);
+    assert_eq!(contract.internal_get_voter(&"dao.near".to_string()).locking_positions.len(), 1);
+}
+
+#[test]
+#[should_panic(expected = "Minimum lock for another account is 1000 mpDAO.")]
+fn gifted_mpdao_deposit_below_1000_is_rejected() {
+    let mut contract = new_contract();
+    testing_env!(context("mpdao.near").build());
+    contract.ft_on_transfer(
+        acct("gifter.near"),
+        U128(999 * ONE_MPDAO),
+        "[\"alice.near\",30]".to_string(),
+    );
+}
+
+#[test]
+fn gifted_mpdao_deposit_of_1000_is_accepted() {
+    let mut contract = new_contract();
+    testing_env!(context("mpdao.near").build());
+    contract.ft_on_transfer(
+        acct("gifter.near"),
+        U128(MIN_GIFT_LOCK),
+        "[\"alice.near\",30]".to_string(),
+    );
+    assert_eq!(
+        contract
+            .internal_get_voter(&"alice.near".to_string())
+            .locking_positions
+            .get(0)
+            .unwrap()
+            .amount,
+        MIN_GIFT_LOCK
+    );
 }
 
 #[test]
@@ -177,6 +244,38 @@ fn full_voter_can_still_add_votes_to_existing_address() {
     }
     // already at the max: more power on an existing address must work
     contract.vote(U128(ONE_MPDAO), "a0.near".to_string(), "x".to_string());
+}
+
+#[test]
+fn operator_sets_mpdao_avail_to_sell() {
+    let mut contract = new_contract();
+    testing_env!(context("operator.near").attached_deposit(1).build());
+    contract.update_mpdao_avail_to_sell(U128(42 * ONE_MPDAO));
+    assert_eq!(contract.mpdao_avail_to_sell, 42 * ONE_MPDAO);
+}
+
+#[test]
+fn owner_sets_mpdao_avail_to_sell() {
+    let mut contract = new_contract();
+    testing_env!(context("owner.near").attached_deposit(1).build());
+    contract.update_mpdao_avail_to_sell(U128(7 * ONE_MPDAO));
+    assert_eq!(contract.mpdao_avail_to_sell, 7 * ONE_MPDAO);
+}
+
+#[test]
+#[should_panic(expected = "Only the owner or the operator can call this function.")]
+fn stranger_cannot_set_mpdao_avail_to_sell() {
+    let mut contract = new_contract();
+    testing_env!(context("alice.near").attached_deposit(1).build());
+    contract.update_mpdao_avail_to_sell(U128(1));
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn avail_to_sell_requires_one_yocto() {
+    let mut contract = new_contract();
+    testing_env!(context("operator.near").build());
+    contract.update_mpdao_avail_to_sell(U128(1));
 }
 
 #[test]

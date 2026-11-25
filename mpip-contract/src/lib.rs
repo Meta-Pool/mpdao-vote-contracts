@@ -621,7 +621,8 @@ impl MpipContract {
     // *********
 
     /// After the ballot ends, re-read each voter's current MetaVote power, lower any
-    /// vote that dropped, then mark the proposal executed if quorum still holds.
+    /// vote that dropped, then mark the proposal executed if quorum still holds
+    /// and for votes exceed against votes.
     /// One call covers `RECONCILE_BATCH` voters. When the log asks to continue,
     /// call `process_voting_status_from` with that index. Attach at least 130 Tgas.
     pub fn process_voting_status(&mut self, mpip_id: MpipId) {
@@ -717,13 +718,19 @@ impl MpipContract {
         if proposal.executed || proposal.canceled {
             return;
         }
-        if self.internal_is_quorum_reached(mpip_id) {
-            // TODO EXECUTE
-            proposal.executed = true;
-            self.proposals.insert(&mpip_id, &proposal);
-            log!("Proposal {} executed", mpip_id);
-        } else {
+        if !self.internal_is_quorum_reached(mpip_id) {
             log!("Proposal {} quorum not reached after reconcile", mpip_id);
+            return;
         }
+        if !self.get_proposal_vote_succeeded(mpip_id) {
+            log!(
+                "Proposal {} quorum reached but for did not exceed against",
+                mpip_id
+            );
+            return;
+        }
+        proposal.executed = true;
+        self.proposals.insert(&mpip_id, &proposal);
+        log!("Proposal {} executed", mpip_id);
     }
 }

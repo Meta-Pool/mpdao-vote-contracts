@@ -88,6 +88,7 @@ impl MetaVoteContract {
     /// token is disabled by default
     #[payable]
     pub fn set_token_info(&mut self, token_address: &AccountId, token_decimals: u8) {
+        assert_one_yocto();
         self.assert_only_owner();
         // sanity check token_decimals >= 3
         require!(
@@ -119,6 +120,7 @@ impl MetaVoteContract {
     /// enable/disable a token that can be used to buy mpDAO
     #[payable]
     pub fn enable_token(&mut self, token_address: &AccountId, enabled: bool) {
+        assert_one_yocto();
         self.assert_only_owner();
         if let Some(mut token_info) = self.token_info.get(token_address) {
             token_info.enabled = enabled;
@@ -305,6 +307,7 @@ impl MetaVoteContract {
     ) {
         // lock for sender or others
         let voter_id = options.beneficiary.clone().unwrap_or(sender_id.to_string());
+        self.assert_min_gift_lock(sender_id.as_str(), &voter_id, mpdao_amount);
         let mut voter = self.internal_get_voter(&voter_id);
         self.deposit_locking_position(mpdao_amount, options.days, &voter_id, &mut voter);
 
@@ -336,9 +339,16 @@ impl MetaVoteContract {
         }
     }
 
+    /// Cap on mpDAO the buy path may lock. The owner or the operator sets it.
+    /// The contract does not check this number against the token balance.
     #[payable]
     pub fn update_mpdao_avail_to_sell(&mut self, mpdao_avail_to_sell: U128String) {
-        self.assert_only_owner();
+        assert_one_yocto();
+        let caller = env::predecessor_account_id();
+        require!(
+            caller == self.owner_id || caller == self.operator_id,
+            "Only the owner or the operator can call this function."
+        );
         self.mpdao_avail_to_sell = mpdao_avail_to_sell.0;
     }
 

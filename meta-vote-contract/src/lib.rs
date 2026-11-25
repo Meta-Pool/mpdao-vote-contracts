@@ -645,6 +645,18 @@ impl MetaVoteContract {
         );
     }
 
+    /// A vote of `delegated` whose target is the voter. It adds and spends the same
+    /// voting power, so removing it does not change net capacity. The delegate record
+    /// is the voter already being edited; reloading it from storage would claw other
+    /// votes back on a stale copy and the later save would put those votes back.
+    fn is_self_delegation(
+        voter_id: &String,
+        contract_address: &ContractAddress,
+        votable_object_id: &VotableObjId,
+    ) -> bool {
+        contract_address == DELEGATED_CONTRACT_CODE && votable_object_id == voter_id
+    }
+
     fn internal_vote(
         &mut self,
         voter_id: &String,
@@ -799,7 +811,11 @@ impl MetaVoteContract {
                 );
             }
             let remove_votes = votes - voting_power;
-            voter.available_voting_power += remove_votes;
+            // Self-delegation does not free voting power: the same amount leaves
+            // the used votes and the received delegation.
+            if !Self::is_self_delegation(&voter_id, &contract_address, &votable_object_id) {
+                voter.available_voting_power += remove_votes;
+            }
             votes -= remove_votes;
 
             // Update timestamp for modified vote (not for delegations, see above)
@@ -821,7 +837,9 @@ impl MetaVoteContract {
                 &votable_object_id,
             );
 
-            if contract_address == DELEGATED_CONTRACT_CODE {
+            if contract_address == DELEGATED_CONTRACT_CODE
+                && !Self::is_self_delegation(&voter_id, &contract_address, &votable_object_id)
+            {
                 // remove delegated vp
                 self.internal_remove_delegated_voting_power(&votable_object_id, remove_votes);
             }
@@ -847,7 +865,11 @@ impl MetaVoteContract {
             .get(&votable_object_id)
             .expect("Cannot unvote a Votable Object without votes.");
 
-        voter.available_voting_power += user_vote_for_object; // available voting power
+        // Self-delegation is a wash, so removing it must not credit available power
+        // and must not reload this same voter from storage.
+        if !Self::is_self_delegation(voter_id, contract_address, votable_object_id) {
+            voter.available_voting_power += user_vote_for_object;
+        }
         user_votes_for_app.remove(&votable_object_id);
 
         if user_votes_for_app.is_empty() {
@@ -870,7 +892,9 @@ impl MetaVoteContract {
             &votable_object_id,
         );
 
-        if contract_address == DELEGATED_CONTRACT_CODE {
+        if contract_address == DELEGATED_CONTRACT_CODE
+            && !Self::is_self_delegation(voter_id, contract_address, votable_object_id)
+        {
             // Claw back excess votes the delegate may have already cast with this VP.
             self.internal_remove_delegated_voting_power(votable_object_id, user_vote_for_object);
         }
@@ -1172,20 +1196,6 @@ impl MetaVoteContract {
 
         // save voter
         self.voters.insert(&voter_id, &voter);
-    }
-
-    /// Operator repair tool for `total_voting_power`, which is a hand-maintained counter.
-    /// Step 1 (off-chain): sum the result of `get_locked_voting_power_page` over all pages.
-    /// Step 2: call this with the sum. Needed once after deploying the unlock guard, because
-    /// repeated unlock calls may already have drained the counter on mainnet.
-    pub fn operator_set_total_voting_power(&mut self, new_total_voting_power: U128String) {
-        self.assert_operator();
-        log!(
-            "TOTAL-VOTING-POWER: operator changed it from {} to {}",
-            self.total_voting_power,
-            new_total_voting_power.0
-        );
-        self.total_voting_power = new_total_voting_power.0;
     }
 
     // bot-managed. Users might get delegated-vp, but also delegated-vp can be removed

@@ -86,6 +86,7 @@ impl FungibleTokenReceiver for MetaVoteContract {
                         Err(_) => panic!("Err parsing bonding_days from msg. Must be u16"),
                     }
                 };
+                self.assert_min_gift_lock(sender_id.as_str(), &voter_id, amount);
                 // lock mpDAO for signer or others
                 let mut voter = self.internal_get_voter(&voter_id);
                 self.deposit_locking_position(amount, days, &voter_id, &mut voter);

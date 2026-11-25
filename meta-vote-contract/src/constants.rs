@@ -2,6 +2,8 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, BorshStorageKey, CryptoHash, Gas};
 
 pub const ONE_MPDAO: u128 = 1_000_000; // MPDAO has 6 decimals
+/// A lock paid by someone other than the recipient. 1,000 whole mpDAO.
+pub const MIN_GIFT_LOCK: u128 = 1_000 * ONE_MPDAO;
 pub const E18: u128 = 1_000_000_000_000_000_000; // to convert 6 decimals to 24 decimals
 pub const TGAS: u64 = 1_000_000_000_000;
 

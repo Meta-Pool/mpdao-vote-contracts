@@ -121,8 +121,7 @@ impl MetaVoteContract {
     }
 
     /// Sum of the voting power of all LOCKED positions for a page of voters.
-    /// Add up all pages to get the value `total_voting_power` should have, then pass it to
-    /// `operator_set_total_voting_power`.
+    /// Add the pages to compare with the stored `total_voting_power`.
     pub fn get_locked_voting_power_page(&self, from_index: u32, limit: u32) -> U128String {
         let keys = self.voters.keys_as_vector();
         let voters_len = keys.len() as u64;
@@ -378,6 +377,10 @@ impl MetaVoteContract {
     // query current meta ready for distribution
     pub fn get_total_unclaimed_mpdao(&self) -> U128String {
         self.total_unclaimed_mpdao.into()
+    }
+    /// mpDAO owed as an unlocked claim, not held in a locking position.
+    pub fn get_total_unclaimed_unlocked_mpdao(&self) -> U128String {
+        self.total_unclaimed_unlocked_mpdao.into()
     }
     // kept to not break public interface
     pub fn get_total_unclaimed_meta(&self) -> U128String {

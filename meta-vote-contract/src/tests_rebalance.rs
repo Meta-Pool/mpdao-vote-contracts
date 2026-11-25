@@ -201,6 +201,93 @@ fn rebalance_decrease_on_another_object_is_not_affected_by_the_freeze() {
     );
 }
 
+/// Legacy self-delegation plus a smaller app vote. Numbers are chosen so the stale
+/// reload used to shrink the app vote (and then the outer save put it back).
+fn setup_self_delegation() -> (MetaVoteContract, u128, u128, u128) {
+    let mut contract = new_contract();
+    let voter_id = "alice.near".to_string();
+    let mut alice = contract.internal_get_voter(&voter_id);
+    contract.internal_create_locking_position(&mut alice, 100 * ONE_MPDAO, 60);
+    let locked = alice.available_voting_power;
+    contract.voters.insert(&voter_id, &alice);
+
+    // Self-delegation first, while the whole lock is still free. It adds and spends
+    // the same power, so available stays at `locked`.
+    let self_vp = locked * 60 / 100;
+    let mut alice = contract.internal_get_voter(&voter_id);
+    let available_before = alice.available_voting_power;
+    let contract_address = delegated();
+    contract.internal_create_voting_position(
+        &voter_id,
+        &mut alice,
+        self_vp,
+        &contract_address,
+        &voter_id,
+    );
+    // Creating the delegation also reloads alice from storage and saves that copy.
+    // Put back the voter that holds the new vote, with available unchanged.
+    alice.available_voting_power = available_before;
+    contract.voters.insert(&voter_id, &alice);
+
+    let app_vp = locked / 2;
+    testing_env!(context("alice.near").build());
+    contract.vote(U128(app_vp), "app.near".to_string(), "prop".to_string());
+    (contract, locked, self_vp, app_vp)
+}
+
+#[test]
+fn unvoting_a_self_delegation_keeps_other_votes() {
+    let (mut contract, _, _, app_vp) = setup_self_delegation();
+    let available = contract
+        .internal_get_voter(&"alice.near".to_string())
+        .available_voting_power;
+    testing_env!(context_at("alice.near", T0 + 8 * DAY_NS).build());
+    contract.unvote(delegated(), "alice.near".to_string());
+
+    let alice = contract.internal_get_voter(&"alice.near".to_string());
+    assert_eq!(alice.sum_delegated_away_vp(), 0);
+    assert_eq!(alice.available_voting_power, available);
+    assert_eq!(
+        contract
+            .get_total_votes("app.near".to_string(), "prop".to_string())
+            .0,
+        app_vp
+    );
+    // the app vote is still removable; the stale clawback used to make this panic
+    contract.unvote("app.near".to_string(), "prop".to_string());
+    assert_eq!(
+        contract
+            .get_total_votes("app.near".to_string(), "prop".to_string())
+            .0,
+        0
+    );
+}
+
+#[test]
+fn reducing_a_self_delegation_does_not_free_voting_power() {
+    let (mut contract, _, self_vp, app_vp) = setup_self_delegation();
+    let available = contract
+        .internal_get_voter(&"alice.near".to_string())
+        .available_voting_power;
+    let kept = self_vp / 2;
+    testing_env!(context_at("alice.near", T0 + 8 * DAY_NS).build());
+    contract.rebalance(U128(kept), delegated(), "alice.near".to_string());
+
+    let alice = contract.internal_get_voter(&"alice.near".to_string());
+    assert_eq!(alice.sum_delegated_away_vp(), kept);
+    assert_eq!(alice.available_voting_power, available);
+    assert_eq!(
+        contract.internal_get_delegated_vp(&"alice.near".to_string()),
+        kept
+    );
+    assert_eq!(
+        contract
+            .get_total_votes("app.near".to_string(), "prop".to_string())
+            .0,
+        app_vp
+    );
+}
+
 #[test]
 fn rebalance_decrease_works_after_the_freeze_ends() {
     let (mut contract, power) = contract_with_frozen_vote(frozen_until());

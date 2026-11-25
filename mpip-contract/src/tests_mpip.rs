@@ -49,12 +49,19 @@ fn contract_with_proposal() -> MpipContract {
 
 /// runs a callback that reads one promise result holding a U128 (JSON string)
 fn with_promise_result(value: &str) {
+    with_promise_results(&[value]);
+}
+
+fn with_promise_results(values: &[&str]) {
     testing_env!(
         builder("mpip.near").build(),
         VMConfig::test(),
         RuntimeFeesConfig::test(),
         HashMap::default(),
-        vec![PromiseResult::Successful(format!("\"{}\"", value).into_bytes())]
+        values
+            .iter()
+            .map(|value| PromiseResult::Successful(format!("\"{}\"", value).into_bytes()))
+            .collect()
     );
 }
 
@@ -173,6 +180,36 @@ fn close_lowers_a_sold_vote_and_does_not_execute_without_quorum() {
     contract.reconcile_votes_for_close_callback(0, vec![acct("alice.near")], 1);
     assert_eq!(contract.internal_get_proposal_vote(0).for_votes, 0);
     assert!(!contract.internal_get_proposal(&0).executed);
+}
+
+#[test]
+fn close_does_not_execute_when_abstain_meets_quorum_and_for_loses() {
+    let mut contract = contract_with_proposal();
+    with_promise_result("1000");
+    contract.start_voting_period_callback(0);
+    with_promise_result("100");
+    contract.vote_proposal_callback(0, acct("alice.near"), VoteType::For, U128(0), String::new());
+    with_promise_result("200");
+    contract.vote_proposal_callback(0, acct("bob.near"), VoteType::Against, U128(0), String::new());
+    with_promise_result("200");
+    contract.vote_proposal_callback(0, acct("carol.near"), VoteType::Abstain, U128(0), String::new());
+    after_the_ballot("mpip.near");
+    with_promise_results(&["100", "200", "200"]);
+    contract.reconcile_votes_for_close_callback(
+        0,
+        vec![acct("alice.near"), acct("bob.near"), acct("carol.near")],
+        3,
+    );
+    let vote = contract.internal_get_proposal_vote(0);
+    assert_eq!(vote.for_votes, 100);
+    assert_eq!(vote.against_votes, 200);
+    assert_eq!(vote.abstain_votes, 200);
+    assert!(!contract.internal_get_proposal(&0).executed);
+    after_the_ballot("mpip.near");
+    assert!(matches!(
+        contract.get_proposal_state(0),
+        MpipState::Rejected
+    ));
 }
 
 #[test]

@@ -470,6 +470,132 @@ impl MetaVoteContract {
         let unlocking_started_at = position.unlocking_started_at.unwrap_or(0);
         let usdt_amount = quote.usdt_amount.0;
         let payout_token = quote.payout_token.clone();
+        let discount_bps = quote.discount_bps;
+
+        voter.remove_position(index);
+        if was_locked {
+            self.total_voting_power = self.total_voting_power.saturating_sub(voting_power);
+            self.require_vp_available(&voter_id, &mut voter);
+        }
+        self.voters.insert(&voter_id, &voter);
+
+        self.pay_sale(
+            seller,
+            index,
+            mpdao_amount,
+            locking_days,
+            voting_power,
+            unlocking_started_at,
+            usdt_amount,
+            payout_token,
+            discount_bps,
+        )
+    }
+
+    /// Sell part of a locked or unlocking position and leave the rest in place.
+    /// The slice uses the same discount as selling the whole position.
+    /// A failed USDT transfer puts the slice back on the position.
+    #[payable]
+    pub fn sell_partial_locking_position(
+        &mut self,
+        index: PositionIndex,
+        amount: U128String,
+    ) -> Promise {
+        assert_one_yocto();
+        let amount = amount.0;
+        let seller = env::predecessor_account_id();
+        let voter_id = seller.to_string();
+        let mut voter = self.internal_get_voter_or_panic(&voter_id);
+        let mut position = voter.get_position(index);
+        let pricing_days = sell_pricing_days(&position);
+        require!(
+            pricing_days.is_some(),
+            "only a locked or unlocking position can be sold"
+        );
+        require!(
+            amount < position.amount,
+            "use sell_locking_position to sell the whole position"
+        );
+        let remainder = position.amount - amount;
+        self.assert_min_deposit_amount(amount);
+        self.assert_min_deposit_amount(remainder);
+        assert_at_least_1_mpdao(amount);
+        assert_at_least_1_mpdao(remainder);
+
+        let payout_token = self.usdt_payout_token();
+        let token_info = self
+            .token_info
+            .get(&payout_token)
+            .expect("USDT token not found");
+        require!(
+            token_info.token_decimals == 6,
+            "USDT payout token must have 6 decimals"
+        );
+        require!(token_info.enabled, "USDT is not enabled");
+        let price = self
+            .mpdao_prices
+            .get(&payout_token)
+            .expect("USDT price not found");
+        require!(price.is_fresh(), "price is stale");
+        require!(!price.paused, "USDT price is paused");
+        require!(
+            !self.sell_price_guard.days.is_empty(),
+            "USDT sell price is not initialized"
+        );
+        let sell_price = protective_mpdao_per_token(&self.sell_price_guard.days);
+        let days = pricing_days.unwrap();
+        let usdt_amount = discounted_token_out(amount, token_info.token_decimals, sell_price, days);
+        require!(usdt_amount > 0, "USDT offer is zero");
+        require!(
+            token_info.amount_received >= usdt_amount,
+            "not enough USDT in the buy-and-lock reserve"
+        );
+        let paid_today = self.usdt_paid_today();
+        let daily_room = SELL_DAILY_USDT_CAP.saturating_sub(paid_today);
+        require!(
+            usdt_amount <= daily_room,
+            "daily USDT payout cap reached"
+        );
+
+        let remove_vp = utils::calculate_voting_power(amount, position.locking_period);
+        let applied_vp = remove_vp.min(position.voting_power);
+        let was_locked = position.is_locked();
+        let unlocking_started_at = position.unlocking_started_at.unwrap_or(0);
+        let locking_days = position.locking_period;
+        position.amount = remainder;
+        position.voting_power -= applied_vp;
+        voter.locking_positions.replace(index, &position);
+        if was_locked {
+            self.total_voting_power = self.total_voting_power.saturating_sub(applied_vp);
+            self.require_vp_available(&voter_id, &mut voter);
+        }
+        self.voters.insert(&voter_id, &voter);
+
+        self.pay_sale(
+            seller,
+            index,
+            amount,
+            locking_days,
+            applied_vp,
+            unlocking_started_at,
+            usdt_amount,
+            payout_token,
+            sell_discount_bps(days),
+        )
+    }
+
+    fn pay_sale(
+        &mut self,
+        seller: AccountId,
+        index: PositionIndex,
+        mpdao_amount: u128,
+        locking_days: Days,
+        voting_power: u128,
+        unlocking_started_at: u64,
+        usdt_amount: u128,
+        payout_token: AccountId,
+        discount_bps: u16,
+    ) -> Promise {
         let payout_day = env::block_timestamp_ms() / MS_PER_DAY;
         if self.sell_price_guard.payout_day_index != payout_day {
             self.sell_price_guard.payout_day_index = payout_day;
@@ -480,13 +606,6 @@ impl MetaVoteContract {
             .usdt_paid_today
             .checked_add(usdt_amount)
             .expect("daily USDT payout overflow");
-
-        voter.remove_position(index);
-        if was_locked {
-            self.total_voting_power = self.total_voting_power.saturating_sub(voting_power);
-            self.require_vp_available(&voter_id, &mut voter);
-        }
-        self.voters.insert(&voter_id, &voter);
 
         let mut token_info = self
             .token_info
@@ -505,7 +624,7 @@ impl MetaVoteContract {
             mpdao_amount,
             locking_days,
             usdt_amount,
-            quote.discount_bps
+            discount_bps
         );
 
         ext_ft_core::ext(payout_token.clone())
@@ -646,15 +765,33 @@ impl MetaVoteContract {
         voting_power: u128,
         unlocking_started_at: u64,
     ) {
-        // No max_locking_positions check here: this is a rollback of a position the
-        // seller already owned. Anyone can fill the seller's slots by gifting locks,
-        // and a panic would leave the mpDAO orphaned (position removed, sale failed).
-        voter.locking_positions.push(&LockingPosition::new(
-            mpdao_amount,
-            locking_days,
-            voting_power,
-            Some(unlocking_started_at),
-        ));
+        // A partial sale leaves the unlocking position in place, so the slice goes
+        // back onto it. A full sale removed it, so the slice is pushed as its own position.
+        let existing = voter.locking_positions.iter().enumerate().find_map(|(i, pos)| {
+            if pos.locking_period == locking_days
+                && pos.unlocking_started_at == Some(unlocking_started_at)
+            {
+                Some(i as u64)
+            } else {
+                None
+            }
+        });
+        if let Some(index) = existing {
+            let mut position = voter.get_position(index);
+            position.amount += mpdao_amount;
+            position.voting_power += voting_power;
+            voter.locking_positions.replace(index, &position);
+        } else {
+            // No max_locking_positions check here: this is a rollback of a position the
+            // seller already owned. Anyone can fill the seller's slots by gifting locks,
+            // and a panic would leave the mpDAO orphaned (position removed, sale failed).
+            voter.locking_positions.push(&LockingPosition::new(
+                mpdao_amount,
+                locking_days,
+                voting_power,
+                Some(unlocking_started_at),
+            ));
+        }
         self.voters.insert(voter_id, voter);
     }
 

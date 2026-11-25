@@ -32,6 +32,18 @@ impl MetaVoteContract {
         );
     }
 
+    /// A lock for another account has to be at least `MIN_GIFT_LOCK`.
+    /// A lock for the payer keeps `min_deposit_amount`.
+    pub(crate) fn assert_min_gift_lock(&self, sender_id: &str, voter_id: &str, amount: u128) {
+        if sender_id == voter_id {
+            return;
+        }
+        assert!(
+            amount >= MIN_GIFT_LOCK,
+            "Minimum lock for another account is 1000 mpDAO."
+        );
+    }
+
     /// get the delegated vote amount for a delegate (user_id == votable object_id)
     /// in order to delegate votes, a user "votes" for the delegate, and that vp is assigned to the delegate
     pub(crate) fn internal_get_delegated_vp(&self, user_id: &VotableObjId) -> u128 {
@@ -62,6 +74,9 @@ impl MetaVoteContract {
     /// delegates over-voted when they had already cast the delegated VP on proposals/
     /// validators. We now recompute from locked + remaining delegated and claw back
     /// excess votes via `adjust_voter_voting_power`.
+    ///
+    /// Callers must not use this for a self-delegation. The delegator record is already
+    /// dirty, and reloading it here would save a stale copy over those edits.
     pub(crate) fn internal_remove_delegated_voting_power(
         &mut self,
         delegate_id: &String,
