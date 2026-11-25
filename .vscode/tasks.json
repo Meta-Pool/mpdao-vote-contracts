@@ -22,8 +22,8 @@
 			"label": "build WASM contracts"
 		},
 		{
-			"type": "cargo",
-			"command": "test",
+			"type": "shell",
+			"command": "cargo test",
 			"problemMatcher": [
 				"$rustc"
 			],
